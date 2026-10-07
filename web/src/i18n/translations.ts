@@ -52,6 +52,7 @@ export interface Translations {
     notional: string;
     estFee: string;
     requiredPower: string;
+    requiredShares: string;
     availableCash: string;
     availableShares: string;
     submitBuy: string;
@@ -246,7 +247,8 @@ export const translations: Record<Language, Translations> = {
       quickQty: 'Quick Lots',
       notional: 'Gross Notional',
       estFee: 'Est. Fee (15 bps)',
-      requiredPower: 'Total Required Cash / Purchasing Power',
+      requiredPower: 'Total Required',
+      requiredShares: 'Required Shares',
       availableCash: 'Available Cash',
       availableShares: 'Available Shares',
       submitBuy: 'Submit Buy Order',
@@ -439,7 +441,8 @@ export const translations: Record<Language, Translations> = {
       quickQty: 'Chọn Nhanh Lô',
       notional: 'Giá Trị Lệnh Gốc',
       estFee: 'Phí Ước Tính (0.15%)',
-      requiredPower: 'Tổng Tiền Cần / Sức Mua',
+      requiredPower: 'Tổng Tiền Cần',
+      requiredShares: 'Cổ Phiếu Cần Bán',
       availableCash: 'Tiền Mặt Khả Dụng',
       availableShares: 'Cổ Phiếu Khả Dụng',
       submitBuy: 'Gửi Lệnh MUA',

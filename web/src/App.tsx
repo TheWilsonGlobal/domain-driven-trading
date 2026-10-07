@@ -127,27 +127,27 @@ function TradingApp() {
             </span>
             <span className="text-slate-500">|</span>
             <span className="text-slate-400">Best Bid:</span>
-            <span className="text-emerald-400 font-medium tabular-nums">
+            <span className="text-emerald-400 font-medium tabular-nums whitespace-nowrap">
               {engineState.depth.bestBid ? `${formatCurrency(engineState.depth.bestBid)} VND` : '—'}
             </span>
             <span className="text-slate-400">Best Ask:</span>
-            <span className="text-rose-400 font-medium tabular-nums">
+            <span className="text-rose-400 font-medium tabular-nums whitespace-nowrap">
               {engineState.depth.bestAsk ? `${formatCurrency(engineState.depth.bestAsk)} VND` : '—'}
             </span>
             <span className="text-slate-400">{t.orderBook.spread}:</span>
-            <span className="text-amber-400 font-medium tabular-nums">
+            <span className="text-amber-400 font-medium tabular-nums whitespace-nowrap">
               {engineState.depth.spread ? `${formatCurrency(engineState.depth.spread)} VND` : '0 VND'}
             </span>
           </div>
 
           <div className="flex items-center gap-3 text-slate-400">
-            <span className="flex items-center gap-1.5 text-emerald-400">
+            <span className="flex items-center gap-1.5 text-emerald-400 whitespace-nowrap">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
               FIFO Price-Time Active
             </span>
             <span className="text-slate-600">·</span>
             <span className="text-slate-400">{t.ledger.availableCash}:</span>
-            <span className="text-emerald-300 font-bold tabular-nums">
+            <span className="text-emerald-300 font-bold tabular-nums whitespace-nowrap">
               {formatCurrency(Math.max(0, (activeAccount?.cashBalance || 0) - (activeAccount?.lockedCash || 0)))} VND
             </span>
           </div>

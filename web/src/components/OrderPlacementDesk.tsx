@@ -250,23 +250,23 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
 
           {/* Purchasing Power & Risk Summary */}
           <div className="bg-slate-950/80 border border-slate-800/80 rounded-md p-2.5 text-xs space-y-1.5 font-mono tabular-nums">
-            <div className="flex justify-between text-slate-400">
-              <span>{t.orderDesk.notional}:</span>
-              <span className="text-slate-200">{formatCurrency(notional)} VND</span>
+            <div className="flex justify-between items-center gap-2 text-slate-400">
+              <span className="truncate">{t.orderDesk.notional}:</span>
+              <span className="text-slate-200 whitespace-nowrap shrink-0 text-right">{formatCurrency(notional)} VND</span>
             </div>
-            <div className="flex justify-between text-slate-400">
-              <span>{t.orderDesk.estFee}:</span>
-              <span className="text-slate-200">{formatCurrency(estimatedFee)} VND</span>
+            <div className="flex justify-between items-center gap-2 text-slate-400">
+              <span className="truncate">{t.orderDesk.estFee}:</span>
+              <span className="text-slate-200 whitespace-nowrap shrink-0 text-right">{formatCurrency(estimatedFee)} VND</span>
             </div>
-            <div className="flex justify-between font-semibold pt-1 border-t border-slate-800/80 text-white">
-              <span>{side === 'BUY' ? t.orderDesk.requiredPower : t.orderDesk.availableShares}:</span>
-              <span className={side === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}>
+            <div className="flex justify-between items-center gap-2 font-semibold pt-1 border-t border-slate-800/80 text-white">
+              <span className="truncate">{side === 'BUY' ? t.orderDesk.requiredPower : t.orderDesk.requiredShares}:</span>
+              <span className={`whitespace-nowrap shrink-0 text-right ${side === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {side === 'BUY' ? `${formatCurrency(requiredFunds)} VND` : `${formatNumber(quantity)} shares`}
               </span>
             </div>
-            <div className="flex justify-between text-[11px] text-slate-500 pt-0.5">
-              <span>{side === 'BUY' ? t.orderDesk.availableCash : t.orderDesk.availableShares}:</span>
-              <span className={hasSufficientFunds ? 'text-slate-300' : 'text-rose-400 font-bold'}>
+            <div className="flex justify-between items-center gap-2 text-[11px] text-slate-500 pt-0.5">
+              <span className="truncate">{side === 'BUY' ? t.orderDesk.availableCash : t.orderDesk.availableShares}:</span>
+              <span className={`whitespace-nowrap shrink-0 text-right ${hasSufficientFunds ? 'text-slate-300' : 'text-rose-400 font-bold'}`}>
                 {side === 'BUY' ? `${formatCurrency(availableCash)} VND` : `${formatNumber(availableHolding)} shares`}
               </span>
             </div>
