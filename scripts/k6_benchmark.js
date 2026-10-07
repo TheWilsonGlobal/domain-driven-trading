@@ -61,8 +61,8 @@ export default function () {
     },
   };
 
-  const startTime = new Date().getTime();
-  const res = http.post('http://localhost:8080/v1/orders', payload, params);
+  const gatewayPort = __ENV.PORT || '5470';
+  const res = http.post(`http://localhost:${gatewayPort}/v1/orders`, payload, params);
   const duration = new Date().getTime() - startTime;
 
   const isSuccess = check(res, {

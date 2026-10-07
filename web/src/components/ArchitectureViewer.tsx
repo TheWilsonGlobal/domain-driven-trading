@@ -255,7 +255,7 @@ services:
   gateway:
     build: { context: .., dockerfile: deployments/Dockerfile, target: gateway }
     container_name: ddt-gateway
-    ports: ["8080:8080"]
+    ports: ["5470:5470"]
   settlement:
     build: { context: .., dockerfile: deployments/Dockerfile, target: settlement }
     container_name: ddt-settlement`,
@@ -275,25 +275,25 @@ services:
     container_name: ddt-engine
     extra_hosts: ["host.docker.internal:host-gateway"]
     environment:
-      KAFKA_BROKERS: "\${KAFKA_BROKERS:-host.docker.internal:19092}"
+      KAFKA_BROKERS: "\${KAFKA_BROKERS:-host.docker.internal:9100}"
       REDIS_ADDR: "\${REDIS_ADDR:-host.docker.internal:6379}"
   settlement:
     build: { context: .., dockerfile: deployments/Dockerfile, target: settlement }
     container_name: ddt-settlement
     extra_hosts: ["host.docker.internal:host-gateway"]
     environment:
-      KAFKA_BROKERS: "\${KAFKA_BROKERS:-host.docker.internal:19092}"
+      KAFKA_BROKERS: "\${KAFKA_BROKERS:-host.docker.internal:9100}"
       DATABASE_URL: "\${DATABASE_URL:-postgres://postgres:password@host.docker.internal:5432/domain_driven_trading?sslmode=disable}"
   gateway:
     build: { context: .., dockerfile: deployments/Dockerfile, target: gateway }
     container_name: ddt-gateway
     extra_hosts: ["host.docker.internal:host-gateway"]
     environment:
-      PORT: "8080"
-      KAFKA_BROKERS: "\${KAFKA_BROKERS:-host.docker.internal:19092}"
+      PORT: "5470"
+      KAFKA_BROKERS: "\${KAFKA_BROKERS:-host.docker.internal:9100}"
       REDIS_ADDR: "\${REDIS_ADDR:-host.docker.internal:6379}"
       DATABASE_URL: "\${DATABASE_URL:-postgres://postgres:password@host.docker.internal:5432/domain_driven_trading?sslmode=disable}"
-    ports: ["8080:8080"]`,
+    ports: ["5470:5470"]`,
   },
   {
     path: 'scripts/k6_benchmark.js',

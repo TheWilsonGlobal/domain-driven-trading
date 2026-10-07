@@ -12,7 +12,7 @@ RUN apk --no-cache add ca-certificates tzdata
 
 FROM base AS gateway
 COPY --from=builder /app/bin/gateway /usr/local/bin/gateway
-EXPOSE 8080
+EXPOSE 5470
 ENTRYPOINT ["/usr/local/bin/gateway"]
 
 FROM base AS engine

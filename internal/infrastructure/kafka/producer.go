@@ -1,4 +1,4 @@
-﻿package kafka
+package kafka
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
 	"github.com/google/uuid"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/app/ports"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
@@ -97,7 +98,10 @@ func (p *WatermillPublisher) Close() error {
 }
 
 // In-memory PubSub fallback for testing and lightweight standalone setups
-func NewInMemoryPublisher() (*WatermillPublisher, *message.PubSub) {
-	pubSub := message.NewPubSub(watermill.NewStdLogger(false, false))
+func NewInMemoryPublisher() (*WatermillPublisher, *gochannel.GoChannel) {
+	pubSub := gochannel.NewGoChannel(
+		gochannel.Config{OutputChannelBuffer: 1000},
+		watermill.NopLogger{},
+	)
 	return NewWatermillPublisher(pubSub, slog.Default()), pubSub
 }

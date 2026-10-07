@@ -1,4 +1,4 @@
-﻿package command
+package command
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/app/ports"
-	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/account"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/common"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
 )

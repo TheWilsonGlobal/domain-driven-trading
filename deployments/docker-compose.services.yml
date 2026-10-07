@@ -1,10 +1,8 @@
-version: '3.8'
-
 # Domain-Driven Trading Services only (Engine, Gateway, Settlement Worker)
-# Connects to external infrastructure (Hub / Host):
-# - Redpanda (Kafka) at localhost:19092
-# - PostgreSQL 16 at localhost:5432
-# - Redis 7 at localhost:6379
+# Connects to external infrastructure:
+# - Redpanda (Kafka)
+# - PostgreSQL 16
+# - Redis 7
 
 services:
   # 1. Matching Engine Core
@@ -17,7 +15,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      KAFKA_BROKERS: "${KAFKA_BROKERS:-host.docker.internal:19092}"
+      KAFKA_BROKERS: "${KAFKA_BROKERS:-host.docker.internal:9100}"
       REDIS_ADDR: "${REDIS_ADDR:-host.docker.internal:6379}"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
     restart: unless-stopped
@@ -32,7 +30,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      KAFKA_BROKERS: "${KAFKA_BROKERS:-host.docker.internal:19092}"
+      KAFKA_BROKERS: "${KAFKA_BROKERS:-host.docker.internal:9100}"
       DATABASE_URL: "${DATABASE_URL:-postgres://postgres:password@host.docker.internal:5432/domain_driven_trading?sslmode=disable}"
     restart: unless-stopped
 
@@ -46,10 +44,10 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      PORT: "8080"
-      KAFKA_BROKERS: "${KAFKA_BROKERS:-host.docker.internal:19092}"
+      PORT: "${PORT:-5470}"
+      KAFKA_BROKERS: "${KAFKA_BROKERS:-host.docker.internal:9100}"
       REDIS_ADDR: "${REDIS_ADDR:-host.docker.internal:6379}"
       DATABASE_URL: "${DATABASE_URL:-postgres://postgres:password@host.docker.internal:5432/domain_driven_trading?sslmode=disable}"
     ports:
-      - "8080:8080"
+      - "${PORT:-5470}:${PORT:-5470}"
     restart: unless-stopped

@@ -119,7 +119,7 @@ cd web
 pnpm install
 pnpm dev
 ```
-Navigate to `http://localhost:5173` to access the interactive bilingual trading terminal.
+Navigate to `http://localhost:5471` to access the interactive bilingual trading terminal (API Gateway runs on `http://localhost:5470`).
 
 ### High-Throughput Load Testing (k6)
 ```bash
