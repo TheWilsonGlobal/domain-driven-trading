@@ -261,6 +261,41 @@ services:
     container_name: ddt-settlement`,
   },
   {
+    path: 'deployments/docker-compose.services.yml',
+    category: 'deployment',
+    title: 'Docker Compose (Trading Services Only - External Infrastructure)',
+    language: 'yaml',
+    content: `version: '3.8'
+
+# Starts Engine, Gateway, and Settlement Worker only
+# Connects to existing external infrastructure (Redpanda, PostgreSQL, Redis)
+services:
+  engine:
+    build: { context: .., dockerfile: deployments/Dockerfile, target: engine }
+    container_name: ddt-engine
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    environment:
+      KAFKA_BROKERS: "\${KAFKA_BROKERS:-host.docker.internal:19092}"
+      REDIS_ADDR: "\${REDIS_ADDR:-host.docker.internal:6379}"
+  settlement:
+    build: { context: .., dockerfile: deployments/Dockerfile, target: settlement }
+    container_name: ddt-settlement
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    environment:
+      KAFKA_BROKERS: "\${KAFKA_BROKERS:-host.docker.internal:19092}"
+      DATABASE_URL: "\${DATABASE_URL:-postgres://postgres:password@host.docker.internal:5432/domain_driven_trading?sslmode=disable}"
+  gateway:
+    build: { context: .., dockerfile: deployments/Dockerfile, target: gateway }
+    container_name: ddt-gateway
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    environment:
+      PORT: "8080"
+      KAFKA_BROKERS: "\${KAFKA_BROKERS:-host.docker.internal:19092}"
+      REDIS_ADDR: "\${REDIS_ADDR:-host.docker.internal:6379}"
+      DATABASE_URL: "\${DATABASE_URL:-postgres://postgres:password@host.docker.internal:5432/domain_driven_trading?sslmode=disable}"
+    ports: ["8080:8080"]`,
+  },
+  {
     path: 'scripts/k6_benchmark.js',
     category: 'deployment',
     title: 'k6 High-Throughput Load Test (>5,000 req/sec)',

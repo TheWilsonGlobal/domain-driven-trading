@@ -75,6 +75,8 @@ A production-grade, low-latency, event-driven Proof of Concept (PoC) for an inst
 - (Optional) k6 for load testing
 
 ### Run Backend with Docker Compose
+
+#### Option A: Standalone Stack (Self-contained)
 ```bash
 make docker-up
 ```
@@ -83,6 +85,21 @@ This spins up:
 2. **PostgreSQL 16** at `localhost:5432` with pre-seeded accounts
 3. **Redis 7** at `localhost:6379`
 4. **Domain-Driven Trading Services** (Engine, Gateway, Settlement Worker)
+
+#### Option B: Domain-Driven Trading Services Only (Using External Infrastructure)
+When running against existing or external shared infrastructure (Kafka/Redpanda, PostgreSQL 16, Redis):
+```bash
+# Start only Engine, Gateway, and Settlement Worker:
+make docker-up SERVICES_ONLY=true
+# Or shortcut:
+make docker-up-services
+
+# (Optional) Seed accounts into PostgreSQL:
+make seed-db
+
+# Stop services only:
+make docker-down-services
+```
 
 ### Run Unit Tests & Invariant Verification
 ```bash
