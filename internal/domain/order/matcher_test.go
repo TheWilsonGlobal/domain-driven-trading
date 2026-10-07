@@ -56,7 +56,7 @@ func TestMatcher_PartialFillsAndSpread(t *testing.T) {
 }
 
 func BenchmarkMatcher_LimitOrderMatching(b *testing.B) {
-	symbol := Symbol("VPB")
+	symbol := Symbol("APX")
 	ob := NewOrderBook(symbol)
 	matcher := NewMatcher(ob)
 

@@ -1,4 +1,4 @@
-package kafka
+﻿package kafka
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/ThreeDotsLabs/watermill/message"
-	"github.com/vortex-trading/vortex-trading-engine/internal/app/ports"
-	"github.com/vortex-trading/vortex-trading-engine/internal/domain/order"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/app/ports"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
 )
 
 type SettlementConsumer struct {

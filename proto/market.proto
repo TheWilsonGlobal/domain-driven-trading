@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package vortex.market.v1;
+package domain_driven_trading.market.v1;
 
-option go_package = "github.com/vortex-trading/vortex-trading-engine/proto/gen/vortex/market/v1";
+option go_package = "github.com/domain-driven-trading/domain-driven-trading/proto/gen/market/v1";
 
 message PriceLevel {
   int64 price = 1;       // Price in VND ticks

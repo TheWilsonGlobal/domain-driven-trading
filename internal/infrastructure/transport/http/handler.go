@@ -8,9 +8,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/vortex-trading/vortex-trading-engine/internal/app/command"
-	"github.com/vortex-trading/vortex-trading-engine/internal/app/query"
-	"github.com/vortex-trading/vortex-trading-engine/internal/domain/order"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/app/command"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/app/query"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
 )
 
 type HTTPHandler struct {
@@ -64,7 +64,7 @@ func (h *HTTPHandler) Router() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"status": "healthy",
-			"engine": "vortex-trading-core",
+			"engine": "domain-driven-trading-core",
 			"mode":   "in-memory FIFO matching + EDA",
 		})
 	})
@@ -138,7 +138,7 @@ func (h *HTTPHandler) handleCancelOrder(w http.ResponseWriter, r *http.Request) 
 func (h *HTTPHandler) handleGetOrderBook(w http.ResponseWriter, r *http.Request) {
 	symbol := r.URL.Query().Get("symbol")
 	if symbol == "" {
-		symbol = "VPB"
+		symbol = "APX"
 	}
 	levels := 10
 	if lStr := r.URL.Query().Get("levels"); lStr != "" {

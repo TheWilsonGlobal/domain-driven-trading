@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Check, Copy, FileCode, Folder, GitBranch, Terminal } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface FileDefinition {
   path: string;
@@ -60,74 +61,108 @@ func (q *OrderQueue) Remove(o *Order) {
 		q.Tail = o.Prev
 	}
 
-	rem := o.RemainingQuantity()
-	if q.TotalQuantity >= rem {
-		q.TotalQuantity -= rem
-	} else {
-		q.TotalQuantity = 0
-	}
-
-	if q.Count > 0 {
-		q.Count--
-	}
+	q.TotalQuantity -= o.RemainingQuantity()
+	q.Count--
 	o.Prev = nil
 	o.Next = nil
 }`,
   },
   {
-    path: 'internal/domain/order/matcher.go',
+    path: 'internal/domain/account/account.go',
     category: 'domain',
-    title: 'Matcher (Continuous FIFO Matching Engine)',
+    title: 'Account Purchasing Power & Overdraft Invariant',
     language: 'go',
-    content: `package order
+    content: `package account
 
-// Matcher performs continuous in-memory FIFO price-time matching
-type Matcher struct {
-	book *OrderBook
+import "errors"
+
+var ErrInsufficientBalance = errors.New("insufficient purchasing power")
+
+type Account struct {
+	ID          string
+	CashBalance int64 // In VND ticks (avoid floating point IEEE 754)
+	LockedCash  int64 // Pre-allocated for open buy orders
+	Holdings    map[string]int64
+	LockedStock map[string]int64
 }
 
-func (m *Matcher) ProcessOrder(taker *Order) ([]OrderMatchedEvent, error) {
-	m.book.mu.Lock()
-	defer m.book.mu.Unlock()
-
-	var events []OrderMatchedEvent
-
-	if taker.Side == SideBuy {
-		events = m.matchBuyOrder(taker)
-	} else {
-		events = m.matchSellOrder(taker)
+// ReserveFunds guarantees zero overdraft prior to engine matching
+func (a *Account) ReserveFunds(notionalWithFee int64) error {
+	freeCash := a.CashBalance - a.LockedCash
+	if freeCash < notionalWithFee {
+		return ErrInsufficientBalance
 	}
-
-	// If taker has remaining quantity and is a LIMIT order, rest it in the book
-	if taker.RemainingQuantity() > 0 && taker.Type == TypeLimit {
-		_ = m.book.AddLimitOrder(taker)
-	}
-
-	return events, nil
+	a.LockedCash += notionalWithFee
+	return nil
 }`,
   },
   {
     path: 'internal/domain/account/ledger.go',
     category: 'domain',
-    title: 'Double-Entry General Ledger (Debit/Credit Conservation)',
+    title: 'Double-Entry Bookkeeping Ledger Voucher',
     language: 'go',
     content: `package account
 
-// CreateTradeSettlementJournal creates balanced double-entry vouchers
-// Invariant: Total Stock Debit == Total Stock Credit && Total Cash Debit == Total Cash Credit
-func CreateTradeSettlementJournal(
-	tradeID, buyerID, sellerID, feeCollectorID string,
-	symbol order.Symbol, price order.Price, quantity order.Quantity,
-) (*Transaction, error) {
-	notionalCash := price.Int64() * int64(quantity.Uint32())
-	buyerFee := (notionalCash * DefaultFeeRateBasisPoints) / 10000
-	sellerFee := (notionalCash * DefaultFeeRateBasisPoints) / 10000
-	shares := int64(quantity.Uint32())
+// PostTradeExecution creates atomic debit/credit journal vouchers satisfying Sum(Debits) == Sum(Credits)
+func (l *LedgerService) PostTradeExecution(trade TradeExecution) (*LedgerTransaction, error) {
+	tx := NewLedgerTransaction(trade.TradeID)
 
-	// Buyer: Debit Stock (+Shares), Credit Cash (-(Notional + BuyerFee))
-	// Seller: Debit Cash (+(Notional - SellerFee)), Credit Stock (-Shares)
-	// Clearing: Debit Cash (+(BuyerFee + SellerFee))
-	...
+	// Buyer: Debit Stock (+Qty), Credit Cash (-(Notional + Fee))
+	tx.AddEntry(trade.BuyerAccountID, Debit, AssetStock, trade.Quantity)
+	tx.AddEntry(trade.BuyerAccountID, Credit, AssetCash, trade.Notional + trade.BuyerFee)
+
+	// Seller: Credit Stock (-Qty), Debit Cash (+(Notional - Fee))
+	tx.AddEntry(trade.SellerAccountID, Credit, AssetStock, trade.Quantity)
+	tx.AddEntry(trade.SellerAccountID, Debit, AssetCash, trade.Notional - trade.SellerFee)
+
+	// Exchange Fee Collector: Debit Cash (+(BuyerFee + SellerFee))
+	tx.AddEntry("FEE_COLLECTOR", Debit, AssetCash, trade.BuyerFee + trade.SellerFee)
+
+	if !tx.IsBalanced() {
+		return nil, ErrUnbalancedVoucher
+	}
+	return tx, nil
+}`,
+  },
+  {
+    path: 'internal/app/command/place_order.go',
+    category: 'application',
+    title: 'CQRS PlaceOrder Command Handler',
+    language: 'go',
+    content: `package command
+
+type PlaceOrderCommandHandler struct {
+	matcher     *order.Matcher
+	accountRepo ports.AccountRepository
+	eventBus    ports.EventPublisher
+	idempotency ports.IdempotencyStore
+}
+
+func (h *PlaceOrderCommandHandler) Handle(ctx context.Context, cmd PlaceOrderCommand) (*order.Order, error) {
+	// 1. Idempotency Check (Redis SETNX ClientOrderID)
+	if exists := h.idempotency.SetNX(ctx, cmd.ClientOrderID, time.Minute*10); !exists {
+		return nil, ErrDuplicateClientOrderID
+	}
+
+	// 2. Pre-Trade Risk & Sức Mua Verification
+	acc, _ := h.accountRepo.GetByID(ctx, cmd.AccountID)
+	if cmd.Side == order.SideBuy {
+		requiredFunds := (cmd.Price * cmd.Quantity) * 10015 / 10000 // With 15 bps fee
+		if err := acc.ReserveFunds(requiredFunds); err != nil {
+			return nil, err
+		}
+	}
+
+	// 3. Dispatch to In-Memory FIFO Engine
+	matchedTrades, err := h.matcher.ProcessOrder(newOrder)
+
+	// 4. Publish Event Stream (Kafka / Watermill)
+	h.eventBus.PublishOrderPlaced(newOrder)
+	for _, trade := range matchedTrades {
+		h.eventBus.PublishOrderMatched(trade)
+	}
+
+	return newOrder, nil
 }`,
   },
   {
@@ -136,7 +171,7 @@ func CreateTradeSettlementJournal(
     title: 'Protobuf Order Schema',
     language: 'protobuf',
     content: `syntax = "proto3";
-package vortex.order.v1;
+package domain_driven_trading.order.v1;
 
 message PlaceOrderRequest {
   string client_order_id = 1;
@@ -170,7 +205,7 @@ import (
 	"context"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/vortex-trading/vortex-trading-engine/internal/domain/order"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
 )
 
 // SaveBatch writes trades in high-performance batches using pgx.Batch
@@ -204,20 +239,26 @@ func (r *PostgresTradeRepository) SaveBatch(ctx context.Context, trades []order.
 services:
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v24.1.2
+    container_name: ddt-redpanda
     ports: ["19092:19092"]
   postgres:
     image: postgres:16-alpine
+    container_name: ddt-postgres
     ports: ["5432:5432"]
   redis:
     image: redis:7-alpine
+    container_name: ddt-redis
     ports: ["6379:6379"]
   engine:
     build: { context: .., dockerfile: deployments/Dockerfile, target: engine }
+    container_name: ddt-engine
   gateway:
     build: { context: .., dockerfile: deployments/Dockerfile, target: gateway }
+    container_name: ddt-gateway
     ports: ["8080:8080"]
   settlement:
-    build: { context: .., dockerfile: deployments/Dockerfile, target: settlement }`,
+    build: { context: .., dockerfile: deployments/Dockerfile, target: settlement }
+    container_name: ddt-settlement`,
   },
   {
     path: 'scripts/k6_benchmark.js',
@@ -240,13 +281,32 @@ export const options = {
       ],
     },
   },
+  thresholds: {
+    http_req_duration: ['p(95)<15', 'p(99)<35'], // Sub-millisecond engine + fast HTTP Gateway
+    order_placement_success: ['rate>0.999'],       // 99.9% success rate
+  },
 };`,
   },
 ];
 
 export const ArchitectureViewer: React.FC = () => {
+  const { t } = useLanguage();
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedPath, setSelectedPath] = useState<string>(FILES[0].path);
   const [copied, setCopied] = useState<boolean>(false);
+
+  const categories = [
+    { id: 'all', label: t.common.all },
+    { id: 'domain', label: t.architecture.categories.domain },
+    { id: 'application', label: t.architecture.categories.application },
+    { id: 'infrastructure', label: t.architecture.categories.infrastructure },
+    { id: 'proto', label: t.architecture.categories.proto },
+    { id: 'deployment', label: t.architecture.categories.deployment },
+  ];
+
+  const filteredFiles = selectedCategory === 'all'
+    ? FILES
+    : FILES.filter((f) => f.category === selectedCategory);
 
   const currentFile = FILES.find((f) => f.path === selectedPath) || FILES[0];
 
@@ -257,66 +317,52 @@ export const ArchitectureViewer: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Architecture Explanatory Banner */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-4 sm:p-5">
-        <div className="flex items-center gap-2 pb-3 border-b border-slate-800/80 mb-3">
-          <GitBranch className="w-5 h-5 text-emerald-400" />
-          <h2 className="text-base font-bold text-white tracking-wide">
-            Hexagonal & Domain-Driven Design (DDD) Architecture
+    <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-4 sm:p-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800/80 gap-3">
+        <div>
+          <h2 className="text-base font-bold text-white tracking-wide flex items-center gap-2">
+            <GitBranch className="w-4 h-4 text-emerald-400" />
+            {t.architecture.title}
           </h2>
+          <p className="text-xs text-slate-400 mt-1">
+            {t.architecture.subtitle}
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-          <div className="bg-slate-950/80 border border-slate-800/80 p-3 rounded-md">
-            <span className="font-semibold text-emerald-400 block mb-1">
-              1. Pure Domain Isolation
-            </span>
-            <p className="text-slate-400 text-[11px] leading-relaxed">
-              <code>internal/domain/</code> has zero external dependencies (no Kafka, Postgres, HTTP).
-              Calculations use <code>int64</code> VND ticks and doubly-linked FIFO queues for sub-millisecond execution.
-            </p>
-          </div>
-
-          <div className="bg-slate-950/80 border border-slate-800/80 p-3 rounded-md">
-            <span className="font-semibold text-blue-400 block mb-1">
-              2. CQRS Application Layer
-            </span>
-            <p className="text-slate-400 text-[11px] leading-relaxed">
-              <code>internal/app/</code> organizes commands (PlaceOrder, CancelOrder) and queries (GetOrderBook, GetBalance)
-              interacting strictly through Repository & EventPublisher port interfaces.
-            </p>
-          </div>
-
-          <div className="bg-slate-950/80 border border-slate-800/80 p-3 rounded-md">
-            <span className="font-semibold text-purple-400 block mb-1">
-              3. Event-Driven Infrastructure
-            </span>
-            <p className="text-slate-400 text-[11px] leading-relaxed">
-              Watermill + Kafka (Redpanda) powers event distribution. Background settlement worker consumes
-              <code>orders.events</code> and writes transactions to PostgreSQL 16 via <code>pgx.Batch</code>.
-            </p>
-          </div>
+        {/* Categories Selector */}
+        <div className="flex items-center gap-1 p-0.5 bg-slate-950 border border-slate-800 rounded-md text-xs overflow-x-auto">
+          {categories.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setSelectedCategory(c.id)}
+              className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors whitespace-nowrap ${
+                selectedCategory === c.id
+                  ? 'bg-slate-800 text-emerald-400 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Code Browser Grid */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-lg overflow-hidden flex flex-col md:flex-row min-h-[500px]">
-        {/* File Navigator Sidebar */}
-        <div className="w-full md:w-80 border-b md:border-b-0 md:border-r border-slate-800 bg-slate-950/60 p-3 flex flex-col justify-between">
+      <div className="mt-4 flex flex-col lg:flex-row border border-slate-800 rounded-lg overflow-hidden min-h-[500px]">
+        {/* File Tree Sidebar */}
+        <div className="w-full lg:w-72 bg-slate-950 border-b lg:border-b-0 lg:border-r border-slate-800/80 p-3 flex flex-col justify-between">
           <div>
-            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
-              <Folder className="w-3.5 h-3.5 text-slate-500" />
-              Source Files
+            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+              <Folder className="w-3.5 h-3.5 text-slate-400" />
+              <span>Project Structure</span>
             </div>
             <div className="space-y-1">
-              {FILES.map((f) => (
+              {filteredFiles.map((f) => (
                 <button
                   key={f.path}
                   onClick={() => setSelectedPath(f.path)}
-                  className={`w-full text-left px-2.5 py-1.5 rounded text-xs font-mono transition-colors flex items-center justify-between ${
+                  className={`w-full text-left px-2.5 py-2 rounded text-xs font-mono transition-colors flex items-center justify-between gap-2 ${
                     selectedPath === f.path
-                      ? 'bg-slate-800 text-emerald-400 font-semibold'
+                      ? 'bg-slate-800 text-emerald-400 border border-slate-700/80'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
                   }`}
                 >
@@ -328,7 +374,7 @@ export const ArchitectureViewer: React.FC = () => {
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-500 px-2 font-mono">
-            Vortex Go 1.22+ PoC Codebase
+            Domain-Driven Trading Go 1.22+ PoC
           </div>
         </div>
 
@@ -345,7 +391,7 @@ export const ArchitectureViewer: React.FC = () => {
               className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded transition-colors"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Copied' : 'Copy Code'}</span>
+              <span>{copied ? t.common.copied : t.common.copyCode}</span>
             </button>
           </div>
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Account, LedgerTransaction, Order } from '../engine/types';
-import { CheckCircle, ShieldCheck, XCircle } from 'lucide-react';
+import { CheckCircle, ShieldCheck } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface AccountRiskLedgerProps {
   accounts: Account[];
@@ -19,6 +20,7 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
   onCancelOrder,
   ledgerTransactions,
 }) => {
+  const { t, formatCurrency, formatNumber } = useLanguage();
   const currentAcc = accounts.find((a) => a.id === selectedAccountId) || accounts[0];
   const availableCash = Math.max(0, currentAcc.cashBalance - currentAcc.lockedCash);
 
@@ -32,20 +34,20 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-white tracking-wide">
-                Account Risk & Sức Mua Engine
+                {t.ledger.title}
               </h2>
               <span className="text-xs font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                Zero Overdraft Active
+                {t.ledger.zeroOverdraft}
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Real-time balance reservation with double-entry debit/credit consistency.
+              {t.ledger.subtitle}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Account:</span>
+            <span className="text-xs text-slate-400">{t.common.account}</span>
             <select
               value={selectedAccountId}
               onChange={(e) => onSelectAccount(e.target.value)}
@@ -65,10 +67,10 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4 font-mono tabular-nums">
           <div className="bg-slate-950/80 border border-slate-800/80 p-3.5 rounded-md">
             <span className="text-[11px] text-slate-400 uppercase tracking-wider block">
-              Sức Mua Khả Dụng (Available)
+              {t.ledger.availableCash}
             </span>
             <div className="text-lg font-bold text-emerald-400 mt-1">
-              {availableCash.toLocaleString()} <span className="text-xs text-slate-500 font-normal">VND</span>
+              {formatCurrency(availableCash)} <span className="text-xs text-slate-500 font-normal">VND</span>
             </div>
             <span className="text-[10px] text-slate-500 block mt-1">
               Cash Balance minus locked funds
@@ -77,10 +79,10 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
 
           <div className="bg-slate-950/80 border border-slate-800/80 p-3.5 rounded-md">
             <span className="text-[11px] text-slate-400 uppercase tracking-wider block">
-              Tổng Tiền Mặt (Total Cash)
+              {t.ledger.totalCash}
             </span>
             <div className="text-lg font-bold text-slate-100 mt-1">
-              {currentAcc.cashBalance.toLocaleString()} <span className="text-xs text-slate-500 font-normal">VND</span>
+              {formatCurrency(currentAcc.cashBalance)} <span className="text-xs text-slate-500 font-normal">VND</span>
             </div>
             <span className="text-[10px] text-slate-500 block mt-1">
               Unadjusted cash in ledger
@@ -89,10 +91,10 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
 
           <div className="bg-slate-950/80 border border-slate-800/80 p-3.5 rounded-md">
             <span className="text-[11px] text-slate-400 uppercase tracking-wider block">
-              Tiền Đang Tạm Khóa (Locked)
+              {t.ledger.lockedCash}
             </span>
             <div className="text-lg font-bold text-amber-400 mt-1">
-              {currentAcc.lockedCash.toLocaleString()} <span className="text-xs text-slate-500 font-normal">VND</span>
+              {formatCurrency(currentAcc.lockedCash)} <span className="text-xs text-slate-500 font-normal">VND</span>
             </div>
             <span className="text-[10px] text-slate-500 block mt-1">
               Held for open BUY limit orders
@@ -101,15 +103,15 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
 
           <div className="bg-slate-950/80 border border-slate-800/80 p-3.5 rounded-md">
             <span className="text-[11px] text-slate-400 uppercase tracking-wider block">
-              Danh Mục Cổ Phiếu (Holdings)
+              {t.ledger.holdingsTitle}
             </span>
             <div className="text-xs text-slate-200 mt-1 flex flex-wrap gap-2">
               {Object.entries(currentAcc.holdings).map(([sym, qty]) => {
                 const locked = currentAcc.lockedHoldings[sym] || 0;
                 return (
                   <span key={sym} className="bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded text-[11px]">
-                    <strong className="text-emerald-400">{sym}:</strong> {(qty - locked).toLocaleString()}
-                    {locked > 0 && <span className="text-amber-400 text-[10px]"> (🔒{locked})</span>}
+                    <strong className="text-emerald-400">{sym}:</strong> {formatNumber(qty - locked)}
+                    {locked > 0 && <span className="text-amber-400 text-[10px]"> (🔒{formatNumber(locked)})</span>}
                   </span>
                 );
               })}
@@ -123,7 +125,7 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
         <div className="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-3">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-white tracking-wide">
-              Active Resting Orders ({userActiveOrders.length})
+              {t.ledger.activeOrdersTitle} ({userActiveOrders.length})
             </h3>
             <span className="text-[11px] font-mono text-slate-500">
               In-Memory Order Book Queue
@@ -139,13 +141,13 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
             <table className="w-full text-left text-xs font-mono tabular-nums">
               <thead>
                 <tr className="border-b border-slate-800/60 text-slate-400 text-[11px]">
-                  <th className="py-2 px-3">ORDER ID</th>
-                  <th className="py-2 px-3">SYMBOL</th>
-                  <th className="py-2 px-3">SIDE</th>
-                  <th className="py-2 px-3 text-right">PRICE (VND)</th>
-                  <th className="py-2 px-3 text-right">QTY / REMAINING</th>
-                  <th className="py-2 px-3">STATUS</th>
-                  <th className="py-2 px-3 text-right">ACTION</th>
+                  <th className="py-2 px-3">{t.ledger.orderId}</th>
+                  <th className="py-2 px-3">{t.ledger.symbol}</th>
+                  <th className="py-2 px-3">{t.ledger.side}</th>
+                  <th className="py-2 px-3 text-right">{t.ledger.price}</th>
+                  <th className="py-2 px-3 text-right">{t.ledger.quantity} / {t.ledger.filled}</th>
+                  <th className="py-2 px-3">{t.ledger.status}</th>
+                  <th className="py-2 px-3 text-right">{t.ledger.action}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/40">
@@ -161,12 +163,12 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
                             : 'bg-rose-950 border border-rose-800 text-rose-400'
                         }`}
                       >
-                        {ord.side}
+                        {ord.side === 'BUY' ? t.orderDesk.sideBuy : t.orderDesk.sideSell}
                       </span>
                     </td>
-                    <td className="py-2 px-3 text-right text-slate-100">{ord.price.toLocaleString()}</td>
+                    <td className="py-2 px-3 text-right text-slate-100">{formatCurrency(ord.price)}</td>
                     <td className="py-2 px-3 text-right text-slate-300">
-                      {ord.remainingQuantity.toLocaleString()} / {ord.quantity.toLocaleString()}
+                      {formatNumber(ord.remainingQuantity)} / {formatNumber(ord.quantity)}
                     </td>
                     <td className="py-2 px-3">
                       <span className="text-amber-400 text-[11px]">{ord.status}</span>
@@ -176,7 +178,7 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
                         onClick={() => onCancelOrder(ord.id)}
                         className="px-2 py-1 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 rounded text-[11px] transition-colors"
                       >
-                        Hủy Lệnh
+                        {t.ledger.cancel}
                       </button>
                     </td>
                   </tr>
@@ -186,7 +188,7 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
           </div>
         ) : (
           <div className="text-xs text-slate-500 py-6 text-center font-mono">
-            No active resting orders for {selectedAccountId}.
+            {t.ledger.noActiveOrders}
           </div>
         )}
       </div>
@@ -196,10 +198,10 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
         <div className="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-3">
           <div>
             <h3 className="text-sm font-semibold text-white tracking-wide">
-              Double-Entry General Ledger Vouchers (Nhật ký sổ cái kép)
+              {t.ledger.journalTitle}
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Strict accounting invariant: <code className="text-emerald-400 font-mono">Σ Debits == Σ Credits</code> per transaction.
+              {t.ledger.journalDesc}
             </p>
           </div>
           <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950 border border-emerald-800 px-2 py-0.5 rounded">
@@ -221,7 +223,7 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
                   </div>
                   <div className="flex items-center gap-1.5 text-emerald-400 text-[11px]">
                     <CheckCircle className="w-3.5 h-3.5" />
-                    <span>Balanced Invariant Verified</span>
+                    <span>{t.ledger.balancedProof}</span>
                   </div>
                 </div>
 
@@ -229,11 +231,11 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
                   <table className="w-full text-left text-[11px] tabular-nums">
                     <thead>
                       <tr className="text-slate-500 border-b border-slate-900">
-                        <th className="pb-1">ACCOUNT</th>
-                        <th className="pb-1">TYPE</th>
+                        <th className="pb-1">{t.ledger.account}</th>
+                        <th className="pb-1">{t.ledger.entryType}</th>
                         <th className="pb-1">ASSET</th>
-                        <th className="pb-1 text-right">AMOUNT</th>
-                        <th className="pb-1 pl-3">DESCRIPTION</th>
+                        <th className="pb-1 text-right">{t.ledger.debit} / {t.ledger.credit}</th>
+                        <th className="pb-1 pl-3">{t.ledger.description}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-900/50">
@@ -248,14 +250,14 @@ export const AccountRiskLedger: React.FC<AccountRiskLedgerProps> = ({
                                   : 'text-amber-400 bg-amber-950/60'
                               }`}
                             >
-                              {entry.type}
+                              {entry.type === 'DEBIT' ? t.ledger.debit : t.ledger.credit}
                             </span>
                           </td>
                           <td className="py-1 text-slate-400">
                             {entry.assetType === 'STOCK_SHARE' ? `${entry.symbol || 'STOCK'}` : 'VND CASH'}
                           </td>
                           <td className="py-1 text-right text-slate-100 font-bold">
-                            {entry.amount.toLocaleString()} {entry.assetType === 'STOCK_SHARE' ? 'cp' : 'đ'}
+                            {formatNumber(entry.amount)} {entry.assetType === 'STOCK_SHARE' ? 'shares' : '₫'}
                           </td>
                           <td className="py-1 pl-3 text-slate-400 truncate max-w-xs">
                             {entry.description}

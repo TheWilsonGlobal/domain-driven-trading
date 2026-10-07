@@ -1,11 +1,11 @@
-package account
+﻿package account
 
 import (
 	"sync"
 	"time"
 
-	"github.com/vortex-trading/vortex-trading-engine/internal/domain/common"
-	"github.com/vortex-trading/vortex-trading-engine/internal/domain/order"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/common"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
 )
 
 const (
@@ -34,7 +34,7 @@ func NewAccount(id string, initialCash int64) *Account {
 	}
 }
 
-// AvailableCash returns unreserved cash ("Sức mua" - purchasing power without margin)
+// AvailableCash returns unreserved cash ("Sá»©c mua" - purchasing power without margin)
 func (a *Account) AvailableCash() int64 {
 	a.mu.RLock()
 	defer a.mu.RUnlock()

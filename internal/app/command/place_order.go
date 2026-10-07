@@ -1,4 +1,4 @@
-package command
+﻿package command
 
 import (
 	"context"
@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/vortex-trading/vortex-trading-engine/internal/app/ports"
-	"github.com/vortex-trading/vortex-trading-engine/internal/domain/account"
-	"github.com/vortex-trading/vortex-trading-engine/internal/domain/common"
-	"github.com/vortex-trading/vortex-trading-engine/internal/domain/order"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/app/ports"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/account"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/common"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
 )
 
 type PlaceOrderCommand struct {
@@ -60,7 +60,7 @@ func (h *PlaceOrderHandler) Handle(ctx context.Context, cmd PlaceOrderCommand) (
 		}
 	}
 
-	// 2. Fetch Trader Account for Pre-Trade Risk & Sức Mua Validation
+	// 2. Fetch Trader Account for Pre-Trade Risk & Sá»©c Mua Validation
 	acc, err := h.accountRepo.GetByID(ctx, cmd.AccountID)
 	if err != nil {
 		return nil, err

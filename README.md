@@ -1,6 +1,6 @@
-# Vortex Trading Engine (`vortex-trading-engine`)
+# Domain-Driven Trading Engine (`domain-driven-trading`)
 
-A production-grade, low-latency, event-driven Proof of Concept (PoC) for an institutional securities trading core and risk engine in **Go (Golang)**. Built with Domain-Driven Design (DDD), Hexagonal Architecture, In-Memory FIFO Price-Time Priority order matching, Double-Entry ledger bookkeeping, pre-trade purchasing power ("sức mua") validation, and Kafka/Redpanda Event-Driven Architecture via Watermill.
+A production-grade, low-latency, event-driven Proof of Concept (PoC) for an institutional securities trading core and risk engine in **Go (Golang)** with an interactive **React & TypeScript** web terminal. Built with Domain-Driven Design (DDD), Hexagonal Architecture, In-Memory FIFO Price-Time Priority order matching, Double-Entry ledger bookkeeping, pre-trade purchasing power ("sức mua") validation, and Kafka/Redpanda Event-Driven Architecture via Watermill.
 
 ---
 
@@ -14,6 +14,7 @@ A production-grade, low-latency, event-driven Proof of Concept (PoC) for an inst
 - **Event-Driven Architecture (EDA):** Kafka / Redpanda immutable event log powered by **Watermill** (`orders.placement`, `orders.events`, `market.depth`).
 - **Asynchronous Settlement Worker:** Dedicated consumer persisting executed trades and ledger vouchers to PostgreSQL 16 via `pgx.Batch`.
 - **Pre-Trade Idempotency:** Redis key deduplication (`SETNX`) on `ClientOrderID`.
+- **Interactive Web Terminal & Invariant Test Suite:** Real-time Level 2 Order Book, Execution Tape, Double-entry Ledger, Kafka Inspector, and Bilingual (English & Vietnamese) interface.
 
 ---
 
@@ -42,6 +43,17 @@ A production-grade, low-latency, event-driven Proof of Concept (PoC) for an inst
 │       ├── kafka/                # Watermill Kafka producer & consumer
 │       ├── redis/                # Redis idempotency store
 │       └── transport/            # Chi HTTP router & Gorilla WebSocket Hub
+├── web/                          # FRONTEND WEB APPLICATION (React + Vite + Tailwind + TypeScript)
+│   ├── src/
+│   │   ├── components/           # Trading terminal, L2 depth, Ledger, Kafka viewer, Invariant test
+│   │   ├── engine/               # Client-side deterministic matching & ledger simulation
+│   │   ├── i18n/                 # Bilingual localization (English default & Vietnamese)
+│   │   ├── App.tsx               # Main application container
+│   │   └── main.tsx              # React entrypoint
+│   ├── index.html
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── vite.config.ts
 ├── deployments/
 │   ├── docker-compose.yml        # Redpanda, PostgreSQL 16, Redis, Services
 │   └── Dockerfile                # Multi-stage Alpine container build
@@ -58,10 +70,11 @@ A production-grade, low-latency, event-driven Proof of Concept (PoC) for an inst
 
 ### Prerequisites
 - Go 1.22+
+- Node.js 18+ & pnpm
 - Docker & Docker Compose
 - (Optional) k6 for load testing
 
-### Run with Docker Compose
+### Run Backend with Docker Compose
 ```bash
 make docker-up
 ```
@@ -69,7 +82,7 @@ This spins up:
 1. **Redpanda (Kafka)** at `localhost:19092`
 2. **PostgreSQL 16** at `localhost:5432` with pre-seeded accounts
 3. **Redis 7** at `localhost:6379`
-4. **Vortex Services** (Engine, Gateway, Settlement Worker)
+4. **Domain-Driven Trading Services** (Engine, Gateway, Settlement Worker)
 
 ### Run Unit Tests & Invariant Verification
 ```bash
@@ -82,6 +95,14 @@ make test-race
 ```bash
 make benchmark
 ```
+
+### Run Web Frontend
+```bash
+cd web
+pnpm install
+pnpm dev
+```
+Navigate to `http://localhost:5173` to access the interactive bilingual trading terminal.
 
 ### High-Throughput Load Testing (k6)
 ```bash
@@ -96,7 +117,7 @@ make k6-load
 |---|---|---|
 | `POST` | `/v1/orders` | Place a new limit or market order |
 | `DELETE`| `/v1/orders/{orderID}?account_id={acc}&symbol={sym}` | Cancel active order |
-| `GET` | `/v1/orderbook?symbol=VPB&levels=10` | Get Level 2 market depth |
+| `GET` | `/v1/orderbook?symbol=APX&levels=10` | Get Level 2 market depth |
 | `GET` | `/v1/balance/{accountID}` | Query real-time account purchasing power |
 | `GET` | `/ws/market` | WebSocket stream for L2 depth snapshots & trade ticks |
 | `GET` | `/health` | Service health status |

@@ -1,10 +1,10 @@
-package query
+﻿package query
 
 import (
 	"context"
 
-	"github.com/vortex-trading/vortex-trading-engine/internal/app/ports"
-	"github.com/vortex-trading/vortex-trading-engine/internal/domain/account"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/app/ports"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/account"
 )
 
 type GetBalanceQuery struct {

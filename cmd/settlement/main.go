@@ -9,15 +9,15 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/vortex-trading/vortex-trading-engine/internal/infrastructure/kafka"
-	"github.com/vortex-trading/vortex-trading-engine/internal/infrastructure/persistence/postgres"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/kafka"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/persistence/postgres"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
-	logger.Info("starting vortex settlement worker...")
+	logger.Info("starting domain-driven-trading settlement worker...")
 
 	dbURL := os.Getenv("DATABASE_URL")
 	var pool *pgxpool.Pool

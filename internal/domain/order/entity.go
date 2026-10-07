@@ -1,9 +1,9 @@
-package order
+﻿package order
 
 import (
 	"time"
 
-	"github.com/vortex-trading/vortex-trading-engine/internal/domain/common"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/common"
 )
 
 // Order represents an immutable/mutable active order in memory.

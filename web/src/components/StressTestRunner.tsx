@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { engineInstance } from '../engine/matchingEngine';
-import { Activity, Play, Square, Zap } from 'lucide-react';
+import { Play, Square, Zap } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export const StressTestRunner: React.FC = () => {
+  const { t, formatNumber } = useLanguage();
   const [isRunningBot, setIsRunningBot] = useState<boolean>(false);
   const [ordersPerSec, setOrdersPerSec] = useState<number>(0);
   const [totalSimulated, setTotalSimulated] = useState<number>(0);
@@ -36,7 +38,7 @@ export const StressTestRunner: React.FC = () => {
   };
 
   const simulateRandomOrder = () => {
-    const symbols = ['VPB', 'HPG', 'FPT', 'SSI'];
+    const symbols = ['APX', 'HPG', 'FPT', 'SSI'];
     const sym = symbols[Math.floor(Math.random() * symbols.length)];
     const depth = engineInstance.getMarketDepth(sym, 3);
 
@@ -54,7 +56,7 @@ export const StressTestRunner: React.FC = () => {
     const qty = (Math.floor(Math.random() * 10) + 1) * 100;
 
     const res = engineInstance.placeOrder({
-      accountId: isBuy ? 'ACC_VPB_001' : 'ACC_VPB_002',
+      accountId: isBuy ? 'ACC_APX_001' : 'ACC_APX_002',
       symbol: sym,
       side,
       type,
@@ -85,7 +87,7 @@ export const StressTestRunner: React.FC = () => {
       const isBuy = Math.random() > 0.5;
       const res = engineInstance.placeOrder({
         accountId: 'ACC_INST_MM',
-        symbol: 'VPB',
+        symbol: 'APX',
         side: isBuy ? 'BUY' : 'SELL',
         type: 'LIMIT',
         price: 19500 + (Math.floor(Math.random() * 6) - 3) * 50,
@@ -123,11 +125,11 @@ export const StressTestRunner: React.FC = () => {
             <div className="flex items-center gap-2">
               <Zap className="w-5 h-5 text-amber-400" />
               <h2 className="text-base font-bold text-white tracking-wide">
-                High-Throughput Load & Latency Benchmarks
+                {t.stress.title}
               </h2>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Simulate continuous Market Maker bot flow and high-frequency order bursts targeting &gt;5,000 orders/sec.
+              {t.stress.subtitle}
             </p>
           </div>
 
@@ -143,12 +145,12 @@ export const StressTestRunner: React.FC = () => {
               {isRunningBot ? (
                 <>
                   <Square className="w-3.5 h-3.5 fill-current" />
-                  Stop MM Bot
+                  {t.stress.stopBot}
                 </>
               ) : (
                 <>
                   <Play className="w-3.5 h-3.5 fill-current" />
-                  Start Auto MM Bot
+                  {t.stress.startBot}
                 </>
               )}
             </button>
@@ -159,10 +161,10 @@ export const StressTestRunner: React.FC = () => {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4 font-mono tabular-nums">
           <div className="bg-slate-950/80 border border-slate-800/80 p-3.5 rounded-md">
             <span className="text-[11px] text-slate-400 uppercase tracking-wider block">
-              Throughput (Orders / Sec)
+              {t.stress.currentTps}
             </span>
             <div className="text-2xl font-bold text-emerald-400 mt-1 flex items-baseline gap-1">
-              {ordersPerSec.toLocaleString()}
+              {formatNumber(ordersPerSec)}
               <span className="text-xs text-slate-500 font-normal">ops/s</span>
             </div>
             <span className="text-[10px] text-slate-500 block mt-1">
@@ -172,11 +174,11 @@ export const StressTestRunner: React.FC = () => {
 
           <div className="bg-slate-950/80 border border-slate-800/80 p-3.5 rounded-md">
             <span className="text-[11px] text-slate-400 uppercase tracking-wider block">
-              Average Latency (P50)
+              {t.stress.avgLatency} (P50)
             </span>
             <div className="text-2xl font-bold text-blue-400 mt-1 flex items-baseline gap-1">
               {avgLatencyMicros}
-              <span className="text-xs text-slate-500 font-normal">µs (microseconds)</span>
+              <span className="text-xs text-slate-500 font-normal">µs</span>
             </div>
             <span className="text-[10px] text-slate-500 block mt-1">
               Sub-millisecond in-memory execution
@@ -185,27 +187,27 @@ export const StressTestRunner: React.FC = () => {
 
           <div className="bg-slate-950/80 border border-slate-800/80 p-3.5 rounded-md">
             <span className="text-[11px] text-slate-400 uppercase tracking-wider block">
-              Tail Latency (P99)
+              {t.stress.p99Latency}
             </span>
             <div className="text-2xl font-bold text-purple-400 mt-1 flex items-baseline gap-1">
               {p99LatencyMicros}
               <span className="text-xs text-slate-500 font-normal">µs</span>
             </div>
             <span className="text-[10px] text-slate-500 block mt-1">
-              Worst-case price-level traversal
+              Worst-case price queue traversal
             </span>
           </div>
 
           <div className="bg-slate-950/80 border border-slate-800/80 p-3.5 rounded-md">
             <span className="text-[11px] text-slate-400 uppercase tracking-wider block">
-              Total Matches Executed
+              {t.stress.tradesExecuted}
             </span>
             <div className="text-2xl font-bold text-slate-100 mt-1 flex items-baseline gap-1">
-              {totalMatches.toLocaleString()}
+              {formatNumber(totalMatches)}
               <span className="text-xs text-slate-500 font-normal">trades</span>
             </div>
             <span className="text-[10px] text-slate-500 block mt-1">
-              From {totalSimulated.toLocaleString()} total orders
+              From {formatNumber(totalSimulated)} {t.stress.totalSent.toLowerCase()}
             </span>
           </div>
         </div>
@@ -224,7 +226,7 @@ export const StressTestRunner: React.FC = () => {
                 onClick={() => runBurstStress(count)}
                 className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-slate-700 rounded text-xs font-mono transition-colors"
               >
-                Fire +{count.toLocaleString()} Orders
+                Fire +{formatNumber(count)} Orders
               </button>
             ))}
           </div>

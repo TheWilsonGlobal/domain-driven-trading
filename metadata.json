@@ -1,5 +1,5 @@
 {
-  "name": "vortex-trading-engine",
+  "name": "domain-driven-trading",
   "description": "High-Throughput Trading Core & Risk Engine (PoC) with DDD, In-Memory FIFO Matching Engine, Double-Entry Ledger, Kafka EDA, and Interactive Live Terminal.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

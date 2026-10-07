@@ -4,7 +4,7 @@ services:
   # 1. Redpanda (Kafka compatible high-performance event broker)
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v24.1.2
-    container_name: vortex-redpanda
+    container_name: ddt-redpanda
     command:
       - redpanda start
       - --smp 1
@@ -26,18 +26,18 @@ services:
   # 2. PostgreSQL 16 (Relational Double-Entry Ledger and Trade Audit Store)
   postgres:
     image: postgres:16-alpine
-    container_name: vortex-postgres
+    container_name: ddt-postgres
     environment:
-      POSTGRES_USER: vortex_user
-      POSTGRES_PASSWORD: vortex_secret_password
-      POSTGRES_DB: vortex_exchange
+      POSTGRES_USER: ddt_user
+      POSTGRES_PASSWORD: ddt_secret_password
+      POSTGRES_DB: domain_driven_trading
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ../internal/infrastructure/persistence/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vortex_user -d vortex_exchange"]
+      test: ["CMD-SHELL", "pg_isready -U ddt_user -d domain_driven_trading"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -45,7 +45,7 @@ services:
   # 3. Redis 7 (Pre-Trade Idempotency deduplication & Client Order IDs)
   redis:
     image: redis:7-alpine
-    container_name: vortex-redis
+    container_name: ddt-redis
     ports:
       - "6379:6379"
     volumes:
@@ -56,13 +56,13 @@ services:
       timeout: 5s
       retries: 5
 
-  # 4. Vortex Matching Engine Core
+  # 4. Domain-Driven Trading Matching Engine Core
   engine:
     build:
       context: ..
       dockerfile: deployments/Dockerfile
       target: engine
-    container_name: vortex-engine
+    container_name: ddt-engine
     environment:
       KAFKA_BROKERS: "redpanda:9092"
       REDIS_ADDR: "redis:6379"
@@ -73,34 +73,34 @@ services:
       redis:
         condition: service_healthy
 
-  # 5. Vortex Settlement Worker (PostgreSQL pgx batch writes)
+  # 5. Domain-Driven Trading Settlement Worker (PostgreSQL pgx batch writes)
   settlement:
     build:
       context: ..
       dockerfile: deployments/Dockerfile
       target: settlement
-    container_name: vortex-settlement
+    container_name: ddt-settlement
     environment:
       KAFKA_BROKERS: "redpanda:9092"
-      DATABASE_URL: "postgres://vortex_user:vortex_secret_password@postgres:5432/vortex_exchange?sslmode=disable"
+      DATABASE_URL: "postgres://ddt_user:ddt_secret_password@postgres:5432/domain_driven_trading?sslmode=disable"
     depends_on:
       redpanda:
         condition: service_healthy
       postgres:
         condition: service_healthy
 
-  # 6. Vortex API Gateway (REST & WebSocket L2 Market Depth)
+  # 6. Domain-Driven Trading API Gateway (REST & WebSocket L2 Market Depth)
   gateway:
     build:
       context: ..
       dockerfile: deployments/Dockerfile
       target: gateway
-    container_name: vortex-gateway
+    container_name: ddt-gateway
     environment:
       PORT: "8080"
       KAFKA_BROKERS: "redpanda:9092"
       REDIS_ADDR: "redis:6379"
-      DATABASE_URL: "postgres://vortex_user:vortex_secret_password@postgres:5432/vortex_exchange?sslmode=disable"
+      DATABASE_URL: "postgres://ddt_user:ddt_secret_password@postgres:5432/domain_driven_trading?sslmode=disable"
     ports:
       - "8080:8080"
     depends_on:

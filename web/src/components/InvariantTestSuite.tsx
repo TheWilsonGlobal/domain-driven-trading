@@ -1,31 +1,33 @@
 import React, { useState } from 'react';
-import { VortexSimulationEngine } from '../engine/matchingEngine';
+import { DomainDrivenTradingEngine } from '../engine/matchingEngine';
 import { CheckCircle2, Play, RefreshCw, XCircle } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface TestCase {
   id: string;
   name: string;
   description: string;
-  run: (engine: VortexSimulationEngine) => { pass: boolean; details: string };
+  run: (engine: DomainDrivenTradingEngine) => { pass: boolean; details: string };
 }
 
 export const InvariantTestSuite: React.FC = () => {
+  const { t } = useLanguage();
   const [results, setResults] = useState<Record<string, { pass: boolean; details: string }>>({});
   const [isRunning, setIsRunning] = useState<boolean>(false);
 
   const testCases: TestCase[] = [
     {
       id: 'inv_fifo',
-      name: '1. In-Memory FIFO Price-Time Priority Guarantee',
-      description: 'Verifies that at the same price level, earlier resting orders are filled before later orders.',
+      name: t.invariants.tests.fifo.name,
+      description: t.invariants.tests.fifo.desc,
       run: (engine) => {
-        const sym = 'VPB';
+        const sym = 'APX';
         const testPrice = 19100;
 
         // Place Maker 1: Buy 100 @ 19,100
         engine.placeOrder({
           clientOrderId: `TEST_FIFO_M1_${Date.now()}`,
-          accountId: 'ACC_VPB_001',
+          accountId: 'ACC_APX_001',
           symbol: sym,
           side: 'BUY',
           type: 'LIMIT',
@@ -36,7 +38,7 @@ export const InvariantTestSuite: React.FC = () => {
         // Place Maker 2: Buy 200 @ 19,100 (same price, later in queue)
         engine.placeOrder({
           clientOrderId: `TEST_FIFO_M2_${Date.now()}`,
-          accountId: 'ACC_VPB_002',
+          accountId: 'ACC_APX_002',
           symbol: sym,
           side: 'BUY',
           type: 'LIMIT',
@@ -55,11 +57,11 @@ export const InvariantTestSuite: React.FC = () => {
           quantity: 50,
         });
 
-        const pass = takerRes.matches.length === 1 && takerRes.matches[0].makerAccountId === 'ACC_VPB_001';
+        const pass = takerRes.matches.length === 1 && takerRes.matches[0].makerAccountId === 'ACC_APX_001';
         return {
           pass,
           details: pass
-            ? 'Matched 50 shares strictly against Maker 1 (ACC_VPB_001) preserving O(1) FIFO linked list order.'
+            ? 'Matched 50 shares strictly against Maker 1 (ACC_APX_001) preserving O(1) FIFO linked list order.'
             : `Failed: Matched against ${takerRes.matches[0]?.makerAccountId}`,
         };
       },
@@ -86,7 +88,7 @@ export const InvariantTestSuite: React.FC = () => {
         // Taker buys 500 @ 28,600 (300 should match, 200 should rest as buy bid)
         const takerRes = engine.placeOrder({
           clientOrderId: `TEST_PARTIAL_T_${Date.now()}`,
-          accountId: 'ACC_VPB_001',
+          accountId: 'ACC_APX_001',
           symbol: sym,
           side: 'BUY',
           type: 'LIMIT',
@@ -108,13 +110,13 @@ export const InvariantTestSuite: React.FC = () => {
     },
     {
       id: 'inv_sức_mua',
-      name: '3. Pre-Trade Sức Mua & Zero Overdraft Guarantee',
-      description: 'Verifies immediate fund lock: Price * Qty * (1 + Fee) and prevents account overdraft.',
+      name: t.invariants.tests.zeroOverdraft.name,
+      description: t.invariants.tests.zeroOverdraft.desc,
       run: (engine) => {
-        const acc = engine.getAccount('ACC_VPB_001');
+        const acc = engine.getAccount('ACC_APX_001');
         if (!acc) return { pass: false, details: 'Account not found' };
 
-        const available = engine.getAvailableCash('ACC_VPB_001');
+        const available = engine.getAvailableCash('ACC_APX_001');
 
         // Attempt to place BUY order exceeding available purchasing power
         const overLimitPrice = 20000;
@@ -122,8 +124,8 @@ export const InvariantTestSuite: React.FC = () => {
 
         const rejectedRes = engine.placeOrder({
           clientOrderId: `TEST_OVERDRAFT_${Date.now()}`,
-          accountId: 'ACC_VPB_001',
-          symbol: 'VPB',
+          accountId: 'ACC_APX_001',
+          symbol: 'APX',
           side: 'BUY',
           type: 'LIMIT',
           price: overLimitPrice,
@@ -141,13 +143,13 @@ export const InvariantTestSuite: React.FC = () => {
     },
     {
       id: 'inv_ledger',
-      name: '4. Double-Entry General Ledger Balance Conservation',
-      description: 'Asserts Σ Stock Debits == Σ Stock Credits and Σ Cash Debits == Σ Cash Credits.',
+      name: t.invariants.tests.doubleEntry.name,
+      description: t.invariants.tests.doubleEntry.desc,
       run: (engine) => {
         // Execute a clean trade
         engine.placeOrder({
           clientOrderId: `TEST_LEDGER_M_${Date.now()}`,
-          accountId: 'ACC_VPB_002',
+          accountId: 'ACC_APX_002',
           symbol: 'SSI',
           side: 'SELL',
           type: 'LIMIT',
@@ -157,7 +159,7 @@ export const InvariantTestSuite: React.FC = () => {
 
         engine.placeOrder({
           clientOrderId: `TEST_LEDGER_T_${Date.now()}`,
-          accountId: 'ACC_VPB_001',
+          accountId: 'ACC_APX_001',
           symbol: 'SSI',
           side: 'BUY',
           type: 'LIMIT',
@@ -178,16 +180,16 @@ export const InvariantTestSuite: React.FC = () => {
     },
     {
       id: 'inv_idempotency',
-      name: '5. Pre-Trade Idempotency Deduplication (Redis Protocol)',
-      description: 'Asserts duplicate client_order_id requests are rejected before state alteration.',
+      name: t.invariants.tests.idempotency.name,
+      description: t.invariants.tests.idempotency.desc,
       run: (engine) => {
         const clientOrderId = `IDEM_TEST_${Date.now()}`;
 
         // 1st request
         const res1 = engine.placeOrder({
           clientOrderId,
-          accountId: 'ACC_VPB_001',
-          symbol: 'VPB',
+          accountId: 'ACC_APX_001',
+          symbol: 'APX',
           side: 'BUY',
           type: 'LIMIT',
           price: 19300,
@@ -197,8 +199,8 @@ export const InvariantTestSuite: React.FC = () => {
         // 2nd duplicate request with same clientOrderId
         const res2 = engine.placeOrder({
           clientOrderId,
-          accountId: 'ACC_VPB_001',
-          symbol: 'VPB',
+          accountId: 'ACC_APX_001',
+          symbol: 'APX',
           side: 'BUY',
           type: 'LIMIT',
           price: 19300,
@@ -219,7 +221,7 @@ export const InvariantTestSuite: React.FC = () => {
   const runAllTests = () => {
     setIsRunning(true);
     // Create isolated test engine so tests don't pollute live terminal
-    const testEngine = new VortexSimulationEngine();
+    const testEngine = new DomainDrivenTradingEngine();
     const newResults: Record<string, { pass: boolean; details: string }> = {};
 
     testCases.forEach((tc) => {
@@ -236,10 +238,10 @@ export const InvariantTestSuite: React.FC = () => {
         <div>
           <h2 className="text-base font-bold text-white tracking-wide flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-            Automated Invariant Verification Suite
+            {t.invariants.title}
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Validates the 5 architectural and financial correctness invariants defined in the VPBankS PoC specification.
+            {t.invariants.subtitle}
           </p>
         </div>
 
@@ -253,7 +255,7 @@ export const InvariantTestSuite: React.FC = () => {
           ) : (
             <Play className="w-3.5 h-3.5 fill-current" />
           )}
-          Run Invariant Verification
+          {isRunning ? t.invariants.runningButton : t.invariants.runButton}
         </button>
       </div>
 
@@ -279,12 +281,12 @@ export const InvariantTestSuite: React.FC = () => {
                     res.pass ? (
                       <span className="bg-emerald-950 border border-emerald-800 text-emerald-400 text-[11px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        PASSED
+                        {t.invariants.passedBadge}
                       </span>
                     ) : (
                       <span className="bg-rose-950 border border-rose-800 text-rose-400 text-[11px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
                         <XCircle className="w-3.5 h-3.5" />
-                        FAILED
+                        {t.invariants.failedBadge}
                       </span>
                     )
                   ) : (

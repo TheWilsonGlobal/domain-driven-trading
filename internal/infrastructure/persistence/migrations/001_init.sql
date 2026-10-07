@@ -1,4 +1,4 @@
--- 001_init.sql: PostgreSQL schema for Vortex Trading Engine
+-- 001_init.sql: PostgreSQL schema for Domain-Driven Trading Engine
 -- Designed for high-frequency trading auditability, partition-ready ledgers, and trade persistence.
 
 CREATE TABLE IF NOT EXISTS accounts (
@@ -74,21 +74,21 @@ CREATE TABLE IF NOT EXISTS ledger_entries (
 CREATE INDEX IF NOT EXISTS idx_ledger_entries_account ON ledger_entries(account_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ledger_entries_tx ON ledger_entries(tx_id);
 
--- Seed initial test accounts with VPBankS & institutional balance
+-- Seed initial test accounts with Apex Securities & institutional balance
 INSERT INTO accounts (account_id, cash_balance, locked_cash)
 VALUES 
-    ('ACC_VPB_001', 500000000, 0),    -- 500M VND
-    ('ACC_VPB_002', 300000000, 0),    -- 300M VND
+    ('ACC_APX_001', 500000000, 0),    -- 500M VND
+    ('ACC_APX_002', 300000000, 0),    -- 300M VND
     ('ACC_INST_MM', 20000000000, 0),  -- 20B VND Market Maker
     ('FEE_COLLECTOR', 0, 0)
 ON CONFLICT (account_id) DO NOTHING;
 
 INSERT INTO account_holdings (account_id, symbol, quantity, locked_quantity)
 VALUES 
-    ('ACC_VPB_001', 'VPB', 10000, 0),
-    ('ACC_VPB_001', 'HPG', 5000, 0),
-    ('ACC_VPB_002', 'VPB', 8000, 0),
-    ('ACC_INST_MM', 'VPB', 100000, 0),
+    ('ACC_APX_001', 'APX', 10000, 0),
+    ('ACC_APX_001', 'HPG', 5000, 0),
+    ('ACC_APX_002', 'APX', 8000, 0),
+    ('ACC_INST_MM', 'APX', 100000, 0),
     ('ACC_INST_MM', 'HPG', 100000, 0),
     ('ACC_INST_MM', 'FPT', 50000, 0)
 ON CONFLICT (account_id, symbol) DO NOTHING;

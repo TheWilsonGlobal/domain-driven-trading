@@ -1,4 +1,4 @@
-module github.com/vortex-trading/vortex-trading-engine
+module github.com/domain-driven-trading/domain-driven-trading
 
 go 1.22.5
 

@@ -5,7 +5,7 @@ import (
 )
 
 func TestOrderBook_FIFO_PriceTimePriority(t *testing.T) {
-	symbol := Symbol("VPB")
+	symbol := Symbol("APX")
 	ob := NewOrderBook(symbol)
 	matcher := NewMatcher(ob)
 

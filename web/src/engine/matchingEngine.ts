@@ -14,7 +14,7 @@ import {
 
 export const BROKERAGE_FEE_BPS = 15; // 0.15% = 15 bps
 
-export class VortexSimulationEngine {
+export class DomainDrivenTradingEngine {
   private orders: Map<string, Order> = new Map();
   private bids: Map<string, Map<number, Order[]>> = new Map(); // symbol -> (price -> orders[])
   private asks: Map<string, Map<number, Order[]>> = new Map(); // symbol -> (price -> orders[])
@@ -53,7 +53,7 @@ export class VortexSimulationEngine {
     this.eventLog = [];
     this.processedClientOrderIds.clear();
 
-    const symbols = ['VPB', 'HPG', 'FPT', 'SSI', 'MWG'];
+    const symbols = ['APX', 'HPG', 'FPT', 'SSI', 'MWG'];
     symbols.forEach((s) => {
       this.bids.set(s, new Map());
       this.asks.set(s, new Map());
@@ -61,31 +61,31 @@ export class VortexSimulationEngine {
     });
 
     // Seed Accounts
-    this.accounts.set('ACC_VPB_001', {
-      id: 'ACC_VPB_001',
-      name: 'Nguyen Van An (VPBankS Retail)',
+    this.accounts.set('ACC_APX_001', {
+      id: 'ACC_APX_001',
+      name: 'Nguyen Van An (Apex Retail)',
       cashBalance: 500_000_000, // 500M VND
       lockedCash: 0,
-      holdings: { VPB: 15000, HPG: 8000, FPT: 2000, SSI: 4000, MWG: 1000 },
-      lockedHoldings: { VPB: 0, HPG: 0, FPT: 0, SSI: 0, MWG: 0 },
+      holdings: { APX: 15000, HPG: 8000, FPT: 2000, SSI: 4000, MWG: 1000 },
+      lockedHoldings: { APX: 0, HPG: 0, FPT: 0, SSI: 0, MWG: 0 },
     });
 
-    this.accounts.set('ACC_VPB_002', {
-      id: 'ACC_VPB_002',
-      name: 'Tran Thi Mai (VPBankS VIP)',
+    this.accounts.set('ACC_APX_002', {
+      id: 'ACC_APX_002',
+      name: 'Tran Thi Mai (Apex VIP)',
       cashBalance: 350_000_000, // 350M VND
       lockedCash: 0,
-      holdings: { VPB: 10000, HPG: 12000, FPT: 3000, SSI: 6000, MWG: 2500 },
-      lockedHoldings: { VPB: 0, HPG: 0, FPT: 0, SSI: 0, MWG: 0 },
+      holdings: { APX: 10000, HPG: 12000, FPT: 3000, SSI: 6000, MWG: 2500 },
+      lockedHoldings: { APX: 0, HPG: 0, FPT: 0, SSI: 0, MWG: 0 },
     });
 
     this.accounts.set('ACC_INST_MM', {
       id: 'ACC_INST_MM',
-      name: 'Vortex Liquidity Provider (MM)',
+      name: 'Apex Liquidity Provider (MM)',
       cashBalance: 25_000_000_000, // 25 Billion VND
       lockedCash: 0,
-      holdings: { VPB: 200000, HPG: 150000, FPT: 80000, SSI: 120000, MWG: 50000 },
-      lockedHoldings: { VPB: 0, HPG: 0, FPT: 0, SSI: 0, MWG: 0 },
+      holdings: { APX: 200000, HPG: 150000, FPT: 80000, SSI: 120000, MWG: 50000 },
+      lockedHoldings: { APX: 0, HPG: 0, FPT: 0, SSI: 0, MWG: 0 },
     });
 
     this.accounts.set('FEE_COLLECTOR', {
@@ -97,8 +97,8 @@ export class VortexSimulationEngine {
       lockedHoldings: {},
     });
 
-    // Seed realistic order books for VPB
-    this.seedMarketMakerLiquidity('VPB', 19500);
+    // Seed realistic order books for APX
+    this.seedMarketMakerLiquidity('APX', 19500);
     this.seedMarketMakerLiquidity('HPG', 28400);
     this.seedMarketMakerLiquidity('FPT', 132000);
     this.seedMarketMakerLiquidity('SSI', 34200);
@@ -696,4 +696,4 @@ export class VortexSimulationEngine {
 }
 
 // Global Singleton Instance for live simulation
-export const engineInstance = new VortexSimulationEngine();
+export const engineInstance = new DomainDrivenTradingEngine();

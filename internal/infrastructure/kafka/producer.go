@@ -1,4 +1,4 @@
-package kafka
+﻿package kafka
 
 import (
 	"context"
@@ -9,8 +9,8 @@ import (
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/google/uuid"
-	"github.com/vortex-trading/vortex-trading-engine/internal/app/ports"
-	"github.com/vortex-trading/vortex-trading-engine/internal/domain/order"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/app/ports"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
 )
 
 type WatermillPublisher struct {

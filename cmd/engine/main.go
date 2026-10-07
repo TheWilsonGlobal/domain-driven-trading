@@ -8,21 +8,21 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/vortex-trading/vortex-trading-engine/internal/app/command"
-	"github.com/vortex-trading/vortex-trading-engine/internal/app/query"
-	"github.com/vortex-trading/vortex-trading-engine/internal/domain/order"
-	"github.com/vortex-trading/vortex-trading-engine/internal/infrastructure/kafka"
-	"github.com/vortex-trading/vortex-trading-engine/internal/infrastructure/persistence/postgres"
-	"github.com/vortex-trading/vortex-trading-engine/internal/infrastructure/redis"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/app/command"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/app/query"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/kafka"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/persistence/postgres"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/redis"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
-	logger.Info("starting vortex-trading-engine matching core...", "version", "1.0.0-poc")
+	logger.Info("starting domain-driven-trading matching core...", "version", "1.0.0-poc")
 
-	symbol := order.Symbol("VPB")
+	symbol := order.Symbol("APX")
 	orderBook := order.NewOrderBook(symbol)
 	matcher := order.NewMatcher(orderBook)
 

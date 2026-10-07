@@ -29,9 +29,9 @@ export const options = {
   },
 };
 
-const SYMBOLS = ['VPB', 'HPG', 'FPT', 'SSI', 'MWG'];
+const SYMBOLS = ['APX', 'HPG', 'FPT', 'SSI', 'MWG'];
 const SIDES = ['BUY', 'SELL'];
-const ACCOUNTS = ['ACC_VPB_001', 'ACC_VPB_002', 'ACC_VPB_003', 'ACC_INST_MM'];
+const ACCOUNTS = ['ACC_APX_001', 'ACC_APX_002', 'ACC_APX_003', 'ACC_INST_MM'];
 
 export default function () {
   const symbol = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];

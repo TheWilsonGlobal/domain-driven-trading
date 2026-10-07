@@ -1,7 +1,7 @@
 .PHONY: help build test test-race benchmark docker-up docker-down run-gateway run-engine run-settlement k6-load
 
 help:
-	@echo "Vortex Trading Engine commands:"
+	@echo "Domain-Driven Trading Engine commands:"
 	@echo "  make build          - Build all Go binaries (gateway, engine, settlement)"
 	@echo "  make test           - Run domain & application unit tests"
 	@echo "  make test-race      - Run tests with race condition detector"

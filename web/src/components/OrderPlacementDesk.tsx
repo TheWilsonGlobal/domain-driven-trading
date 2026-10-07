@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Account, OrderSide, OrderType } from '../engine/types';
 import { BROKERAGE_FEE_BPS } from '../engine/matchingEngine';
 import { ArrowDownLeft, ArrowUpRight, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface OrderPlacementDeskProps {
   account: Account;
@@ -30,6 +31,7 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
   prefillPrice,
   prefillSide,
 }) => {
+  const { t, formatCurrency, formatNumber } = useLanguage();
   const [side, setSide] = useState<OrderSide>('BUY');
   const [orderType, setOrderType] = useState<OrderType>('LIMIT');
   const [price, setPrice] = useState<number>(19500);
@@ -56,7 +58,7 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
 
   // Adjust default price when symbol changes
   useEffect(() => {
-    if (symbol === 'VPB') setPrice(19500);
+    if (symbol === 'APX') setPrice(19500);
     else if (symbol === 'HPG') setPrice(28400);
     else if (symbol === 'FPT') setPrice(132000);
     else if (symbol === 'SSI') setPrice(34200);
@@ -74,11 +76,11 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (quantity <= 0) {
-      setStatusMsg({ type: 'error', text: 'Quantity must be greater than 0' });
+      setStatusMsg({ type: 'error', text: t.orderDesk.errQuantityZero });
       return;
     }
     if (orderType === 'LIMIT' && price <= 0) {
-      setStatusMsg({ type: 'error', text: 'Limit price must be greater than 0' });
+      setStatusMsg({ type: 'error', text: t.orderDesk.errPriceZero });
       return;
     }
 
@@ -101,7 +103,7 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
     }
   };
 
-  const symbols = ['VPB', 'HPG', 'FPT', 'SSI', 'MWG'];
+  const symbols = ['APX', 'HPG', 'FPT', 'SSI', 'MWG'];
 
   return (
     <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-3 sm:p-4 flex flex-col justify-between">
@@ -159,7 +161,7 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
             }`}
           >
             <ArrowDownLeft className="w-4 h-4" />
-            <span>MUA (BUY)</span>
+            <span>{t.orderDesk.sideBuy}</span>
           </button>
           <button
             type="button"
@@ -171,7 +173,7 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
             }`}
           >
             <ArrowUpRight className="w-4 h-4" />
-            <span>BÁN (SELL)</span>
+            <span>{t.orderDesk.sideSell}</span>
           </button>
         </div>
 
@@ -179,9 +181,9 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
           {/* Price Input */}
           <div>
             <div className="flex justify-between text-xs mb-1">
-              <label htmlFor="price-input" className="text-slate-400">Giá đặt (VND)</label>
+              <label htmlFor="price-input" className="text-slate-400">{t.orderDesk.price}</label>
               <span className="text-[11px] font-mono text-slate-500">
-                Bước giá: {tickSize} VND
+                Tick: {tickSize} VND
               </span>
             </div>
             {orderType === 'LIMIT' ? (
@@ -211,8 +213,8 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
               </div>
             ) : (
               <div className="bg-slate-950 border border-slate-800/80 p-2 rounded text-xs text-amber-300 font-mono flex items-center justify-between">
-                <span>Khớp giá thị trường tốt nhất</span>
-                <span>{side === 'BUY' ? bestAsk || 'Ask MP' : bestBid || 'Bid MP'} VND</span>
+                <span>{orderType === 'MARKET' ? t.orderDesk.marketOrder : ''}</span>
+                <span>{side === 'BUY' ? formatCurrency(bestAsk || price) : formatCurrency(bestBid || price)} VND</span>
               </div>
             )}
           </div>
@@ -220,8 +222,8 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
           {/* Quantity Input */}
           <div>
             <div className="flex justify-between text-xs mb-1">
-              <label htmlFor="qty-input" className="text-slate-400">Khối lượng (Cổ phiếu)</label>
-              <span className="text-[11px] font-mono text-slate-500">Lô chuẩn 100 cp</span>
+              <label htmlFor="qty-input" className="text-slate-400">{t.orderDesk.quantity}</label>
+              <span className="text-[11px] font-mono text-slate-500">100 / lot</span>
             </div>
             <input
               id="qty-input"
@@ -240,7 +242,7 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
                   onClick={() => setQuantity(lot)}
                   className="py-1 px-1 bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-[11px] font-mono rounded"
                 >
-                  {lot.toLocaleString()}
+                  {formatNumber(lot)}
                 </button>
               ))}
             </div>
@@ -249,23 +251,23 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
           {/* Purchasing Power & Risk Summary */}
           <div className="bg-slate-950/80 border border-slate-800/80 rounded-md p-2.5 text-xs space-y-1.5 font-mono tabular-nums">
             <div className="flex justify-between text-slate-400">
-              <span>Giá trị lệnh:</span>
-              <span className="text-slate-200">{notional.toLocaleString()} VND</span>
+              <span>{t.orderDesk.notional}:</span>
+              <span className="text-slate-200">{formatCurrency(notional)} VND</span>
             </div>
             <div className="flex justify-between text-slate-400">
-              <span>Phí GD (0.15%):</span>
-              <span className="text-slate-200">{estimatedFee.toLocaleString()} VND</span>
+              <span>{t.orderDesk.estFee}:</span>
+              <span className="text-slate-200">{formatCurrency(estimatedFee)} VND</span>
             </div>
             <div className="flex justify-between font-semibold pt-1 border-t border-slate-800/80 text-white">
-              <span>{side === 'BUY' ? 'Tiền ký quỹ cần:' : 'Cổ phiếu cần:'}</span>
+              <span>{side === 'BUY' ? t.orderDesk.requiredPower : t.orderDesk.availableShares}:</span>
               <span className={side === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}>
-                {side === 'BUY' ? `${requiredFunds.toLocaleString()} VND` : `${quantity.toLocaleString()} cp`}
+                {side === 'BUY' ? `${formatCurrency(requiredFunds)} VND` : `${formatNumber(quantity)} shares`}
               </span>
             </div>
             <div className="flex justify-between text-[11px] text-slate-500 pt-0.5">
-              <span>{side === 'BUY' ? 'Sức mua khả dụng:' : 'CP khả dụng:'}</span>
+              <span>{side === 'BUY' ? t.orderDesk.availableCash : t.orderDesk.availableShares}:</span>
               <span className={hasSufficientSứcMua ? 'text-slate-300' : 'text-rose-400 font-bold'}>
-                {side === 'BUY' ? `${availableCash.toLocaleString()} VND` : `${availableHolding.toLocaleString()} cp`}
+                {side === 'BUY' ? `${formatCurrency(availableCash)} VND` : `${formatNumber(availableHolding)} shares`}
               </span>
             </div>
           </div>
@@ -274,7 +276,7 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
           {!hasSufficientSứcMua && (
             <div className="bg-rose-950/40 border border-rose-800/80 p-2 rounded text-xs text-rose-300 flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
-              <span>Cảnh báo: Vi phạm hạn mức sức mua (Zero Overdraft Guarantee).</span>
+              <span>{t.orderDesk.overdraftGuaranteed}</span>
             </div>
           )}
 
@@ -288,7 +290,7 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
                 : 'bg-rose-500 hover:bg-rose-400 text-white disabled:bg-rose-950 disabled:text-rose-700'
             }`}
           >
-            {side === 'BUY' ? `Xác nhận Mua ${symbol}` : `Xác nhận Bán ${symbol}`}
+            {side === 'BUY' ? `${t.orderDesk.submitBuy} ${symbol}` : `${t.orderDesk.submitSell} ${symbol}`}
           </button>
         </form>
       </div>

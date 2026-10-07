@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package vortex.order.v1;
+package domain_driven_trading.order.v1;
 
-option go_package = "github.com/vortex-trading/vortex-trading-engine/proto/gen/vortex/order/v1";
+option go_package = "github.com/domain-driven-trading/domain-driven-trading/proto/gen/order/v1";
 
 enum OrderSide {
   ORDER_SIDE_UNSPECIFIED = 0;

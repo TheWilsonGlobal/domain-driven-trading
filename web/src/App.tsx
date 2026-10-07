@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { engineInstance } from './engine/matchingEngine';
-import { Account, MarketDepth, OrderSide, OrderType, TradeMatch } from './engine/types';
+import { MarketDepth, OrderSide, OrderType, TradeMatch } from './engine/types';
 import { Header } from './components/Header';
 import { OrderBookDepth } from './components/OrderBookDepth';
 import { OrderPlacementDesk } from './components/OrderPlacementDesk';
@@ -10,23 +10,24 @@ import { EventStreamViewer } from './components/EventStreamViewer';
 import { ArchitectureViewer } from './components/ArchitectureViewer';
 import { StressTestRunner } from './components/StressTestRunner';
 import { InvariantTestSuite } from './components/InvariantTestSuite';
-import { Activity, ShieldCheck, Zap } from 'lucide-react';
+import { LanguageProvider, useLanguage } from './i18n/LanguageContext';
 
-export default function App() {
+function TradingApp() {
+  const { t, formatCurrency, formatNumber } = useLanguage();
   const [activeTab, setActiveTab] = useState<string>('terminal');
-  const [selectedSymbol, setSelectedSymbol] = useState<string>('VPB');
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('ACC_VPB_001');
+  const [selectedSymbol, setSelectedSymbol] = useState<string>('APX');
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('ACC_APX_001');
 
   // React state synchronized with engineInstance
   const [engineState, setEngineState] = useState<{
     depth: MarketDepth;
     trades: TradeMatch[];
-    accounts: Account[];
+    accounts: any[];
     activeOrders: any[];
     events: any[];
     ledger: any[];
   }>({
-    depth: engineInstance.getMarketDepth('VPB', 10),
+    depth: engineInstance.getMarketDepth('APX', 10),
     trades: engineInstance.getTradeHistory(),
     accounts: engineInstance.getAllAccounts(),
     activeOrders: engineInstance.getActiveOrders(),
@@ -127,15 +128,15 @@ export default function App() {
             <span className="text-slate-500">|</span>
             <span className="text-slate-400">Best Bid:</span>
             <span className="text-emerald-400 font-medium tabular-nums">
-              {engineState.depth.bestBid ? `${engineState.depth.bestBid.toLocaleString()} đ` : '—'}
+              {engineState.depth.bestBid ? `${formatCurrency(engineState.depth.bestBid)} đ` : '—'}
             </span>
             <span className="text-slate-400">Best Ask:</span>
             <span className="text-rose-400 font-medium tabular-nums">
-              {engineState.depth.bestAsk ? `${engineState.depth.bestAsk.toLocaleString()} đ` : '—'}
+              {engineState.depth.bestAsk ? `${formatCurrency(engineState.depth.bestAsk)} đ` : '—'}
             </span>
-            <span className="text-slate-400">Spread:</span>
+            <span className="text-slate-400">{t.orderBook.spread}:</span>
             <span className="text-amber-400 font-medium tabular-nums">
-              {engineState.depth.spread ? `${engineState.depth.spread.toLocaleString()} đ` : '0 đ'}
+              {engineState.depth.spread ? `${formatCurrency(engineState.depth.spread)} đ` : '0 đ'}
             </span>
           </div>
 
@@ -145,9 +146,9 @@ export default function App() {
               FIFO Price-Time Active
             </span>
             <span className="text-slate-600">·</span>
-            <span className="text-slate-400">Sức Mua:</span>
+            <span className="text-slate-400">{t.ledger.availableCash}:</span>
             <span className="text-emerald-300 font-bold tabular-nums">
-              {Math.max(0, activeAccount.cashBalance - activeAccount.lockedCash).toLocaleString()} đ
+              {formatCurrency(Math.max(0, (activeAccount?.cashBalance || 0) - (activeAccount?.lockedCash || 0)))} đ
             </span>
           </div>
         </div>
@@ -194,14 +195,14 @@ export default function App() {
               <div className="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-white tracking-wide">
-                    Lệnh Đang Chờ Khớp (Resting Limit Orders)
+                    {t.ledger.activeOrdersTitle}
                   </span>
                   <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
                     {engineState.activeOrders.filter((o) => o.accountId === selectedAccountId).length} Active
                   </span>
                 </div>
                 <span className="text-[11px] text-slate-400">
-                  Account: <strong className="text-emerald-400 font-mono">{selectedAccountId}</strong>
+                  {t.common.account} <strong className="text-emerald-400 font-mono">{selectedAccountId}</strong>
                 </span>
               </div>
 
@@ -210,13 +211,13 @@ export default function App() {
                   <table className="w-full text-left text-xs font-mono tabular-nums">
                     <thead>
                       <tr className="border-b border-slate-800 text-slate-500 text-[11px]">
-                        <th className="py-2 px-2">ID</th>
-                        <th className="py-2 px-2">SYMBOL</th>
-                        <th className="py-2 px-2">SIDE</th>
-                        <th className="py-2 px-2 text-right">GIÁ (VND)</th>
-                        <th className="py-2 px-2 text-right">KHỐI LƯỢNG</th>
-                        <th className="py-2 px-2 text-right">THỜI GIAN</th>
-                        <th className="py-2 px-2 text-right">THAO TÁC</th>
+                        <th className="py-2 px-2">{t.ledger.orderId}</th>
+                        <th className="py-2 px-2">{t.ledger.symbol}</th>
+                        <th className="py-2 px-2">{t.ledger.side}</th>
+                        <th className="py-2 px-2 text-right">{t.ledger.price}</th>
+                        <th className="py-2 px-2 text-right">{t.ledger.quantity}</th>
+                        <th className="py-2 px-2 text-right">{t.tradeTape.timeHeader}</th>
+                        <th className="py-2 px-2 text-right">{t.ledger.action}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/50">
@@ -234,22 +235,22 @@ export default function App() {
                                     : 'bg-rose-950 border border-rose-800 text-rose-400'
                                 }`}
                               >
-                                {ord.side}
+                                {ord.side === 'BUY' ? t.orderDesk.sideBuy : t.orderDesk.sideSell}
                               </span>
                             </td>
-                            <td className="py-2 px-2 text-right text-slate-200">{ord.price.toLocaleString()}</td>
+                            <td className="py-2 px-2 text-right text-slate-200">{formatCurrency(ord.price)}</td>
                             <td className="py-2 px-2 text-right text-slate-300">
-                              {ord.remainingQuantity.toLocaleString()} / {ord.quantity.toLocaleString()}
+                              {formatNumber(ord.remainingQuantity)} / {formatNumber(ord.quantity)}
                             </td>
                             <td className="py-2 px-2 text-right text-slate-500 text-[11px]">
-                              {new Date(ord.createdAt).toLocaleTimeString('vi-VN')}
+                              {new Date(ord.createdAt).toLocaleTimeString()}
                             </td>
                             <td className="py-2 px-2 text-right">
                               <button
                                 onClick={() => handleCancelOrder(ord.id)}
                                 className="px-2 py-0.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 rounded text-[11px] transition-colors"
                               >
-                                Hủy Lệnh
+                                {t.ledger.cancel}
                               </button>
                             </td>
                           </tr>
@@ -259,7 +260,7 @@ export default function App() {
                 </div>
               ) : (
                 <div className="text-xs text-slate-500 py-4 text-center font-mono">
-                  Không có lệnh chờ nào cho tài khoản này. Đặt lệnh giới hạn (Limit Order) để xem lệnh resting trong sổ lệnh.
+                  {t.ledger.noActiveOrders}
                 </div>
               )}
             </div>
@@ -313,10 +314,18 @@ export default function App() {
       {/* Footer */}
       <footer className="border-t border-slate-900 bg-slate-950 py-4 px-6 text-xs text-slate-500 text-center font-mono">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Vortex Trading Engine · Go 1.22 DDD Core · Hexagonal Architecture</span>
-          <span className="text-slate-600">Zero Overdraft · FIFO Price-Time · Watermill EDA · PostgreSQL 16</span>
+          <span>{t.footer.title}</span>
+          <span className="text-slate-600">{t.footer.features}</span>
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      <TradingApp />
+    </LanguageProvider>
   );
 }

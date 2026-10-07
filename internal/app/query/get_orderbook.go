@@ -1,9 +1,9 @@
-package query
+﻿package query
 
 import (
 	"context"
 
-	"github.com/vortex-trading/vortex-trading-engine/internal/domain/order"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
 )
 
 type GetOrderBookQuery struct {

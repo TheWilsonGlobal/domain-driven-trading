@@ -10,14 +10,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/vortex-trading/vortex-trading-engine/internal/app/command"
-	"github.com/vortex-trading/vortex-trading-engine/internal/app/query"
-	"github.com/vortex-trading/vortex-trading-engine/internal/domain/order"
-	"github.com/vortex-trading/vortex-trading-engine/internal/infrastructure/kafka"
-	"github.com/vortex-trading/vortex-trading-engine/internal/infrastructure/persistence/postgres"
-	"github.com/vortex-trading/vortex-trading-engine/internal/infrastructure/redis"
-	httpTransport "github.com/vortex-trading/vortex-trading-engine/internal/infrastructure/transport/http"
-	wsTransport "github.com/vortex-trading/vortex-trading-engine/internal/infrastructure/transport/websocket"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/app/command"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/app/query"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/kafka"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/persistence/postgres"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/redis"
+	httpTransport "github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/transport/http"
+	wsTransport "github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/transport/websocket"
 )
 
 func main() {
@@ -29,7 +29,7 @@ func main() {
 		port = "8080"
 	}
 
-	symbol := order.Symbol("VPB")
+	symbol := order.Symbol("APX")
 	orderBook := order.NewOrderBook(symbol)
 	matcher := order.NewMatcher(orderBook)
 
@@ -85,7 +85,7 @@ func main() {
 	}
 
 	go func() {
-		logger.Info("vortex gateway HTTP & WS server listening", "port", port)
+		logger.Info("domain-driven-trading gateway HTTP & WS server listening", "port", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("server failed", "error", err)
 		}
