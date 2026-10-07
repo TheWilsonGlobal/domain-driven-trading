@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package vortex.market.v1;
+
+option go_package = "github.com/vortex-trading/vortex-trading-engine/proto/gen/vortex/market/v1";
+
+message PriceLevel {
+  int64 price = 1;       // Price in VND ticks
+  uint32 total_quantity = 2; // Aggregated quantity at price level
+  uint32 order_count = 3;    // Number of active limit orders
+}
+
+message MarketDepthSnapshot {
+  string symbol = 1;
+  int64 sequence = 2;
+  int64 timestamp_ns = 3;
+  repeated PriceLevel bids = 4; // Ordered descending (best bid first)
+  repeated PriceLevel asks = 5; // Ordered ascending (best ask first)
+}
+
+message TradeTick {
+  string trade_id = 1;
+  string symbol = 2;
+  int64 price = 3;
+  uint32 quantity = 4;
+  string aggressor_side = 5; // "BUY" or "SELL"
+  int64 timestamp_ns = 6;
+}

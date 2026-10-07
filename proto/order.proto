@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package vortex.order.v1;
+
+option go_package = "github.com/vortex-trading/vortex-trading-engine/proto/gen/vortex/order/v1";
+
+enum OrderSide {
+  ORDER_SIDE_UNSPECIFIED = 0;
+  ORDER_SIDE_BUY = 1;
+  ORDER_SIDE_SELL = 2;
+}
+
+enum OrderType {
+  ORDER_TYPE_UNSPECIFIED = 0;
+  ORDER_TYPE_LIMIT = 1;
+  ORDER_TYPE_MARKET = 2;
+}
+
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+  ORDER_STATUS_NEW = 1;
+  ORDER_STATUS_PARTIALLY_FILLED = 2;
+  ORDER_STATUS_FILLED = 3;
+  ORDER_STATUS_CANCELED = 4;
+  ORDER_STATUS_REJECTED = 5;
+}
+
+message PlaceOrderRequest {
+  string client_order_id = 1;
+  string account_id = 2;
+  string symbol = 3;
+  OrderSide side = 4;
+  OrderType order_type = 5;
+  int64 price = 6;       // In VND ticks (avoid floating-point errors)
+  uint32 quantity = 7;   // Shares
+  int64 timestamp_ns = 8;
+}
+
+message PlaceOrderResponse {
+  string order_id = 1;
+  string client_order_id = 2;
+  OrderStatus status = 3;
+  int64 filled_quantity = 4;
+  int64 remaining_quantity = 5;
+  int64 created_at_ns = 6;
+}
+
+message CancelOrderRequest {
+  string order_id = 1;
+  string account_id = 2;
+  string symbol = 3;
+}
+
+message CancelOrderResponse {
+  string order_id = 1;
+  OrderStatus status = 2;
+  uint32 canceled_quantity = 3;
+}
+
+message OrderExecutionEvent {
+  string trade_id = 1;
+  string symbol = 2;
+  string maker_order_id = 3;
+  string taker_order_id = 4;
+  string maker_account_id = 5;
+  string taker_account_id = 6;
+  int64 match_price = 7;
+  uint32 match_quantity = 8;
+  int64 timestamp_ns = 9;
+}

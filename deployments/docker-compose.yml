@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # 1. Redpanda (Kafka compatible high-performance event broker)
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.1.2
+    container_name: vortex-redpanda
+    command:
+      - redpanda start
+      - --smp 1
+      - --memory 1G
+      - --overprovisioned
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092"
+      - "9644:9644"
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -i healthy || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. PostgreSQL 16 (Relational Double-Entry Ledger and Trade Audit Store)
+  postgres:
+    image: postgres:16-alpine
+    container_name: vortex-postgres
+    environment:
+      POSTGRES_USER: vortex_user
+      POSTGRES_PASSWORD: vortex_secret_password
+      POSTGRES_DB: vortex_exchange
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../internal/infrastructure/persistence/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vortex_user -d vortex_exchange"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 3. Redis 7 (Pre-Trade Idempotency deduplication & Client Order IDs)
+  redis:
+    image: redis:7-alpine
+    container_name: vortex-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 4. Vortex Matching Engine Core
+  engine:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      target: engine
+    container_name: vortex-engine
+    environment:
+      KAFKA_BROKERS: "redpanda:9092"
+      REDIS_ADDR: "redis:6379"
+      LOG_LEVEL: "info"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # 5. Vortex Settlement Worker (PostgreSQL pgx batch writes)
+  settlement:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      target: settlement
+    container_name: vortex-settlement
+    environment:
+      KAFKA_BROKERS: "redpanda:9092"
+      DATABASE_URL: "postgres://vortex_user:vortex_secret_password@postgres:5432/vortex_exchange?sslmode=disable"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  # 6. Vortex API Gateway (REST & WebSocket L2 Market Depth)
+  gateway:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      target: gateway
+    container_name: vortex-gateway
+    environment:
+      PORT: "8080"
+      KAFKA_BROKERS: "redpanda:9092"
+      REDIS_ADDR: "redis:6379"
+      DATABASE_URL: "postgres://vortex_user:vortex_secret_password@postgres:5432/vortex_exchange?sslmode=disable"
+    ports:
+      - "8080:8080"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  redpanda-data:
+  postgres-data:
+  redis-data:
