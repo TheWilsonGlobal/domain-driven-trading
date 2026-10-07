@@ -71,7 +71,7 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
   const estimatedFee = Math.floor((notional * BROKERAGE_FEE_BPS) / 10000);
   const requiredFunds = notional + estimatedFee;
 
-  const hasSufficientSứcMua = side === 'BUY' ? availableCash >= requiredFunds : availableHolding >= quantity;
+  const hasSufficientFunds = side === 'BUY' ? availableCash >= requiredFunds : availableHolding >= quantity;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -266,14 +266,14 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
             </div>
             <div className="flex justify-between text-[11px] text-slate-500 pt-0.5">
               <span>{side === 'BUY' ? t.orderDesk.availableCash : t.orderDesk.availableShares}:</span>
-              <span className={hasSufficientSứcMua ? 'text-slate-300' : 'text-rose-400 font-bold'}>
+              <span className={hasSufficientFunds ? 'text-slate-300' : 'text-rose-400 font-bold'}>
                 {side === 'BUY' ? `${formatCurrency(availableCash)} VND` : `${formatNumber(availableHolding)} shares`}
               </span>
             </div>
           </div>
 
           {/* Zero Overdraft Warning if insufficient funds */}
-          {!hasSufficientSứcMua && (
+          {!hasSufficientFunds && (
             <div className="bg-rose-950/40 border border-rose-800/80 p-2 rounded text-xs text-rose-300 flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
               <span>{t.orderDesk.overdraftGuaranteed}</span>
@@ -283,7 +283,7 @@ export const OrderPlacementDesk: React.FC<OrderPlacementDeskProps> = ({
           {/* Submit Order Button */}
           <button
             type="submit"
-            disabled={!hasSufficientSứcMua}
+            disabled={!hasSufficientFunds}
             className={`w-full py-2.5 px-4 font-bold text-xs rounded-md uppercase tracking-wider transition-all shadow-sm ${
               side === 'BUY'
                 ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 disabled:bg-emerald-950 disabled:text-emerald-700'

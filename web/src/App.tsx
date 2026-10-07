@@ -128,15 +128,15 @@ function TradingApp() {
             <span className="text-slate-500">|</span>
             <span className="text-slate-400">Best Bid:</span>
             <span className="text-emerald-400 font-medium tabular-nums">
-              {engineState.depth.bestBid ? `${formatCurrency(engineState.depth.bestBid)} đ` : '—'}
+              {engineState.depth.bestBid ? `${formatCurrency(engineState.depth.bestBid)} VND` : '—'}
             </span>
             <span className="text-slate-400">Best Ask:</span>
             <span className="text-rose-400 font-medium tabular-nums">
-              {engineState.depth.bestAsk ? `${formatCurrency(engineState.depth.bestAsk)} đ` : '—'}
+              {engineState.depth.bestAsk ? `${formatCurrency(engineState.depth.bestAsk)} VND` : '—'}
             </span>
             <span className="text-slate-400">{t.orderBook.spread}:</span>
             <span className="text-amber-400 font-medium tabular-nums">
-              {engineState.depth.spread ? `${formatCurrency(engineState.depth.spread)} đ` : '0 đ'}
+              {engineState.depth.spread ? `${formatCurrency(engineState.depth.spread)} VND` : '0 VND'}
             </span>
           </div>
 
@@ -148,7 +148,7 @@ function TradingApp() {
             <span className="text-slate-600">·</span>
             <span className="text-slate-400">{t.ledger.availableCash}:</span>
             <span className="text-emerald-300 font-bold tabular-nums">
-              {formatCurrency(Math.max(0, (activeAccount?.cashBalance || 0) - (activeAccount?.lockedCash || 0)))} đ
+              {formatCurrency(Math.max(0, (activeAccount?.cashBalance || 0) - (activeAccount?.lockedCash || 0)))} VND
             </span>
           </div>
         </div>

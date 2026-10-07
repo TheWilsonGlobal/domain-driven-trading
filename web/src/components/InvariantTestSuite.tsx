@@ -109,7 +109,7 @@ export const InvariantTestSuite: React.FC = () => {
       },
     },
     {
-      id: 'inv_sức_mua',
+      id: 'inv_purchasing_power',
       name: t.invariants.tests.zeroOverdraft.name,
       description: t.invariants.tests.zeroOverdraft.desc,
       run: (engine) => {

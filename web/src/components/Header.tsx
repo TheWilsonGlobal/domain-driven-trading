@@ -47,9 +47,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>{t.header.title}</span>
           </a>
-          <span className="hidden lg:inline text-xs font-mono text-slate-500 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-            {t.header.tagline}
-          </span>
         </div>
 
         {/* Zone 2: Navigation links */}

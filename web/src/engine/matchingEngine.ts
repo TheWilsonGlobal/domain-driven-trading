@@ -63,7 +63,7 @@ export class DomainDrivenTradingEngine {
     // Seed Accounts
     this.accounts.set('ACC_APX_001', {
       id: 'ACC_APX_001',
-      name: 'Nguyen Van An (Apex Retail)',
+      name: 'Alex Vance (Apex Retail)',
       cashBalance: 500_000_000, // 500M VND
       lockedCash: 0,
       holdings: { APX: 15000, HPG: 8000, FPT: 2000, SSI: 4000, MWG: 1000 },
@@ -72,7 +72,7 @@ export class DomainDrivenTradingEngine {
 
     this.accounts.set('ACC_APX_002', {
       id: 'ACC_APX_002',
-      name: 'Tran Thi Mai (Apex VIP)',
+      name: 'Sarah Jenkins (Apex VIP)',
       cashBalance: 350_000_000, // 350M VND
       lockedCash: 0,
       holdings: { APX: 10000, HPG: 12000, FPT: 3000, SSI: 6000, MWG: 2500 },

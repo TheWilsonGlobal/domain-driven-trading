@@ -1,5 +1,16 @@
 .PHONY: help build test test-race benchmark docker-up docker-up-services docker-down docker-down-services run-gateway run-engine run-settlement k6-load seed-db
 
+# Check if Go compiler is installed on the host; if not, seamlessly fall back to containerized Go
+HAS_GO := $(shell go version 2>nul)
+
+ifeq ($(HAS_GO),)
+GO = docker run --rm -v "$(CURDIR):/app" -w /app golang:1.22-alpine go
+GO_RACE = docker run --rm -v "$(CURDIR):/app" -w /app golang:1.22 go
+else
+GO = go
+GO_RACE = go
+endif
+
 help:
 	@echo "Domain-Driven Trading Engine commands:"
 	@echo "  make build               - Build all Go binaries (gateway, engine, settlement)"
@@ -19,18 +30,18 @@ help:
 
 build:
 	@mkdir -p bin
-	go build -o bin/gateway ./cmd/gateway
-	go build -o bin/engine ./cmd/engine
-	go build -o bin/settlement ./cmd/settlement
+	$(GO) build -o bin/gateway ./cmd/gateway
+	$(GO) build -o bin/engine ./cmd/engine
+	$(GO) build -o bin/settlement ./cmd/settlement
 
 test:
-	go test -v ./internal/domain/... ./internal/app/...
+	$(GO) test -v ./internal/domain/... ./internal/app/...
 
 test-race:
-	go test -race -v ./internal/domain/... ./internal/app/...
+	$(GO_RACE) test -race -v ./internal/domain/... ./internal/app/...
 
 benchmark:
-	go test -bench=. -benchmem -benchtime=5s ./internal/domain/order/...
+	$(GO) test -bench=. -benchmem -benchtime=5s ./internal/domain/order/...
 
 docker-up:
 ifeq ($(SERVICES_ONLY),true)
@@ -54,13 +65,13 @@ seed-db:
 	docker exec -i postgres psql -U postgres -d domain_driven_trading < internal/infrastructure/persistence/migrations/001_init.sql
 
 run-engine:
-	go run ./cmd/engine/main.go
+	$(GO) run ./cmd/engine/main.go
 
 run-gateway:
-	go run ./cmd/gateway/main.go
+	$(GO) run ./cmd/gateway/main.go
 
 run-settlement:
-	go run ./cmd/settlement/main.go
+	$(GO) run ./cmd/settlement/main.go
 
 k6-load:
 	k6 run scripts/k6_benchmark.js
