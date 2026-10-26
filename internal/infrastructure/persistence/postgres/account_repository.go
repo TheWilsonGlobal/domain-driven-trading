@@ -54,6 +54,34 @@ func (r *PostgresAccountRepository) GetByID(ctx context.Context, accountID strin
 		return acc, nil
 	}
 
+	// Query from PostgreSQL / Supabase if pool is provided
+	if r.pool != nil {
+		var cashBalance, lockedCash int64
+		err := r.pool.QueryRow(ctx, "SELECT cash_balance, locked_cash FROM accounts WHERE account_id = $1", accountID).Scan(&cashBalance, &lockedCash)
+		if err == nil {
+			loadedAcc := account.NewAccount(accountID, cashBalance)
+			loadedAcc.LockedCash = lockedCash
+
+			rows, err := r.pool.Query(ctx, "SELECT symbol, quantity, locked_quantity FROM account_holdings WHERE account_id = $1", accountID)
+			if err == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var sym string
+					var qty, lockedQty int64
+					if err := rows.Scan(&sym, &qty, &lockedQty); err == nil {
+						loadedAcc.CreditStock(order.Symbol(sym), uint32(qty))
+						loadedAcc.LockedStocks[order.Symbol(sym)] = uint32(lockedQty)
+					}
+				}
+			}
+
+			r.inMemoryMu.Lock()
+			r.memoryAccs[accountID] = loadedAcc
+			r.inMemoryMu.Unlock()
+			return loadedAcc, nil
+		}
+	}
+
 	// Create and register new account dynamically with standard starter balance
 	newAcc := account.NewAccount(accountID, 100_000_000)
 	newAcc.CreditStock(order.Symbol("APX"), 2000)
@@ -63,6 +91,14 @@ func (r *PostgresAccountRepository) GetByID(ctx context.Context, accountID strin
 	r.memoryAccs[accountID] = newAcc
 	r.inMemoryMu.Unlock()
 
+	if r.pool != nil {
+		_, _ = r.pool.Exec(ctx, `
+			INSERT INTO accounts (account_id, cash_balance, locked_cash, updated_at)
+			VALUES ($1, $2, $3, NOW())
+			ON CONFLICT (account_id) DO NOTHING;
+		`, newAcc.ID, newAcc.CashBalance, newAcc.LockedCash)
+	}
+
 	return newAcc, nil
 }
 
@@ -70,5 +106,17 @@ func (r *PostgresAccountRepository) Save(ctx context.Context, acc *account.Accou
 	r.inMemoryMu.Lock()
 	r.memoryAccs[acc.ID] = acc
 	r.inMemoryMu.Unlock()
+
+	if r.pool != nil {
+		_, _ = r.pool.Exec(ctx, `
+			INSERT INTO accounts (account_id, cash_balance, locked_cash, updated_at)
+			VALUES ($1, $2, $3, NOW())
+			ON CONFLICT (account_id) DO UPDATE
+			SET cash_balance = EXCLUDED.cash_balance,
+			    locked_cash = EXCLUDED.locked_cash,
+			    updated_at = NOW();
+		`, acc.ID, acc.CashBalance, acc.LockedCash)
+	}
+
 	return nil
 }

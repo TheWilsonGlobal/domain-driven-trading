@@ -1,4 +1,4 @@
-.PHONY: help build test test-race benchmark docker-up docker-up-services docker-down docker-down-services run-gateway run-engine run-settlement k6-load seed-db
+.PHONY: help build test test-race benchmark docker-up docker-up-services docker-down docker-down-services run-gateway run-engine run-settlement k6-load seed-db migrate-supabase
 
 # Check if Go compiler is installed on the host; if not, seamlessly fall back to containerized Go
 HAS_GO := $(shell go version 2>nul)
@@ -63,6 +63,10 @@ seed-db:
 	@echo "Seeding accounts and positions into PostgreSQL..."
 	docker exec -i infra-postgres psql -U postgres -d domain_driven_trading < internal/infrastructure/persistence/migrations/001_init.sql || \
 	docker exec -i postgres psql -U postgres -d domain_driven_trading < internal/infrastructure/persistence/migrations/001_init.sql
+
+migrate-supabase:
+	@echo "Running Supabase migration and account verification..."
+	python scripts/migrate_to_supabase.py
 
 run-engine:
 	$(GO) run ./cmd/engine/main.go

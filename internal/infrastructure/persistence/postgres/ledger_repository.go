@@ -1,4 +1,4 @@
-﻿package postgres
+package postgres
 
 import (
 	"context"
@@ -16,6 +16,9 @@ func NewPostgresLedgerRepository(pool *pgxpool.Pool) *PostgresLedgerRepository {
 }
 
 func (r *PostgresLedgerRepository) SaveTransaction(ctx context.Context, tx *account.Transaction) error {
+	if r.pool == nil {
+		return nil
+	}
 	pgxTx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err

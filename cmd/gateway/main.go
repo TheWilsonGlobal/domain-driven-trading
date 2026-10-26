@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/app/command"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/app/query"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
@@ -33,7 +35,28 @@ func main() {
 	orderBook := order.NewOrderBook(symbol)
 	matcher := order.NewMatcher(orderBook)
 
-	accountRepo := postgres.NewPostgresAccountRepository(nil)
+	dbURL := os.Getenv("DATABASE_URL")
+	var pool *pgxpool.Pool
+	if dbURL != "" {
+		poolConfig, parseErr := pgxpool.ParseConfig(dbURL)
+		if parseErr == nil {
+			poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+			poolConfig.MaxConns = 10
+			poolConfig.MinConns = 2
+			poolConfig.MaxConnLifetime = 30 * time.Minute
+			poolConfig.MaxConnIdleTime = 5 * time.Minute
+			p, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
+			if err != nil {
+				logger.Warn("could not connect to PostgreSQL/Supabase, using in-memory accounts", "err", err)
+			} else {
+				pool = p
+				logger.Info("gateway connected to Supabase/PostgreSQL pool")
+				defer pool.Close()
+			}
+		}
+	}
+
+	accountRepo := postgres.NewPostgresAccountRepository(pool)
 	idempotency := redis.NewRedisIdempotencyStore(nil)
 	eventPublisher, _ := kafka.NewInMemoryPublisher()
 

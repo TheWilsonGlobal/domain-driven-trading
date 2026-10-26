@@ -1,4 +1,4 @@
-﻿package postgres
+package postgres
 
 import (
 	"context"
@@ -18,7 +18,7 @@ func NewPostgresTradeRepository(pool *pgxpool.Pool) *PostgresTradeRepository {
 
 // SaveBatch writes trades in high-performance batches using pgx.Batch
 func (r *PostgresTradeRepository) SaveBatch(ctx context.Context, trades []order.OrderMatchedEvent) error {
-	if len(trades) == 0 {
+	if len(trades) == 0 || r.pool == nil {
 		return nil
 	}
 

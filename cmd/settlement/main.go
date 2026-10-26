@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/kafka"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/persistence/postgres"
@@ -23,9 +24,24 @@ func main() {
 	var pool *pgxpool.Pool
 	var err error
 	if dbURL != "" {
-		pool, err = pgxpool.New(context.Background(), dbURL)
+		poolConfig, parseErr := pgxpool.ParseConfig(dbURL)
+		if parseErr != nil {
+			logger.Warn("could not parse DATABASE_URL, attempting standard connect", "err", parseErr)
+			pool, err = pgxpool.New(context.Background(), dbURL)
+		} else {
+			// Optimize for Supabase & PgBouncer transaction mode
+			poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+			poolConfig.MaxConns = 10
+			poolConfig.MinConns = 2
+			poolConfig.MaxConnLifetime = 30 * time.Minute
+			poolConfig.MaxConnIdleTime = 5 * time.Minute
+			pool, err = pgxpool.NewWithConfig(context.Background(), poolConfig)
+		}
+
 		if err != nil {
-			logger.Warn("could not connect to PostgreSQL, falling back to mock batch logger", "err", err)
+			logger.Warn("could not connect to PostgreSQL/Supabase, falling back to mock batch logger", "err", err)
+		} else {
+			logger.Info("successfully connected to Supabase/PostgreSQL pool")
 		}
 	}
 
