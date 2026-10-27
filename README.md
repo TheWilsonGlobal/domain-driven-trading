@@ -16,9 +16,31 @@ A production-grade, low-latency, event-driven Proof of Concept (PoC) for an inst
 - **Pre-Trade Idempotency:** Redis key deduplication (`SETNX`) on `ClientOrderID`.
 - **Interactive Web Terminal & Invariant Test Suite:** Real-time Level 2 Order Book, Execution Tape, Double-entry Ledger, Kafka Inspector, and Bilingual (English & Vietnamese) interface.
 
+> **Status:** this is a PoC. The domain, matching, risk and HTTP layers are wired; the Kafka, Redis, WebSocket and ledger-persistence adapters are not yet connected end to end. See [Implementation Status](#7-implementation-status).
+
 ---
 
-## 2. Directory Layout (DDD & Hexagonal)
+## 2. Tech Stack
+
+| Layer | Technology | Notes |
+|---|---|---|
+| Language | **Go 1.22** | Three binaries: `gateway`, `engine`, `settlement` |
+| HTTP / WebSocket | `go-chi/chi` v5, `go-chi/cors`, `gorilla/websocket` | REST on `:5470`, `/ws/market` stream |
+| Messaging | **Watermill** v1.3 (Kafka-compatible) over **Redpanda** v24.1 | Topics `orders.placement`, `orders.events`, `market.depth`; in-memory Go-channel bus is the only adapter wired today |
+| Database | **PostgreSQL 16** via `jackc/pgx` v5 (`pgxpool`, `pgx.Batch`) | Local container or **Supabase** (transaction pooler, simple protocol for PgBouncer) |
+| Cache / idempotency | **Redis 7** via `go-redis` v9 | `SETNX` on `ClientOrderID`, with in-memory fallback |
+| IDs | `google/uuid` | Order IDs; trade IDs are `TRD-<ns>-<seq>` |
+| Contracts | Protocol Buffers (`proto/`) | Schema definitions; messages are currently JSON on the wire |
+| Frontend | **React 18**, **TypeScript 5**, **Vite 5**, **Tailwind CSS 4**, `lucide-react` | Bilingual (EN/VI) terminal on `:5471`; pnpm |
+| Packaging | Docker multi-stage (Alpine 3.19), Docker Compose | Targets `gateway`, `engine`, `settlement` |
+| Tooling | Make, **k6**, PowerShell dev script (`scripts/dev.ps1`) | Load test, Supabase migration helpers (Go and Python) |
+| Testing | `go test` (+ `-race`, benchmarks) | Domain matcher and order book tests |
+
+**Architectural patterns:** DDD, Hexagonal (ports and adapters), CQRS-style command/query handlers, event-driven settlement, double-entry bookkeeping.
+
+---
+
+## 3. Directory Layout (DDD & Hexagonal)
 
 ```text
 .
@@ -50,15 +72,19 @@ A production-grade, low-latency, event-driven Proof of Concept (PoC) for an inst
 │   │   ├── i18n/                 # Bilingual localization (English default & Vietnamese)
 │   │   ├── App.tsx               # Main application container
 │   │   └── main.tsx              # React entrypoint
+│   ├── public/favicon.svg
 │   ├── index.html
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── vite.config.ts
 ├── deployments/
 │   ├── docker-compose.yml        # Redpanda, PostgreSQL 16, Redis, Services
+│   ├── docker-compose.services.yml # Services only, against external infra
 │   └── Dockerfile                # Multi-stage Alpine container build
 ├── scripts/
-│   └── k6_benchmark.js           # Load testing targeting >5,000 orders/sec
+│   ├── k6_benchmark.js           # Load testing targeting >5,000 orders/sec
+│   ├── migrate_to_supabase.go/.py # Schema migration + account verification
+│   └── dev.ps1                   # Windows dev launcher
 ├── Makefile
 ├── go.mod
 └── README.md
@@ -66,13 +92,16 @@ A production-grade, low-latency, event-driven Proof of Concept (PoC) for an inst
 
 ---
 
-## 3. Quick Start & Execution
+## 4. Quick Start & Execution
 
 ### Prerequisites
 - Go 1.22+
 - Node.js 18+ & pnpm
 - Docker & Docker Compose
 - (Optional) k6 for load testing
+
+### Configuration
+Copy `.env.example` to `.env`. Key variables: `PORT` (5470), `WEB_PORT` (5471), `DATABASE_URL`, `DIRECT_URL`, `KAFKA_BROKERS`, `REDIS_ADDR`, and the `SUPABASE_*` keys. Never commit real credentials. Without `DATABASE_URL` the gateway falls back to in-memory accounts.
 
 ### Run Backend with Docker Compose
 
@@ -128,7 +157,7 @@ make k6-load
 
 ---
 
-## 4. API Endpoints
+## 5. API Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -141,7 +170,7 @@ make k6-load
 
 ---
 
-## 5. Double-Entry Accounting Verification
+## 6. Double-Entry Accounting Verification
 
 For every executed trade:
 - **Buyer Ledger:**
@@ -156,3 +185,24 @@ For every executed trade:
 $$\sum \text{Stock Debits} = \sum \text{Stock Credits}$$
 $$\sum \text{Cash Debits} = \sum \text{Cash Credits}$$
 Zero overdraft invariant is enforced prior to entering the matching queue.
+
+---
+
+## 7. Implementation Status
+
+| Capability | State |
+|---|---|
+| FIFO price-time matching, limit and market orders | Working, unit-tested |
+| Pre-trade reservation (cash and shares) and cancel release | Working (taker side) |
+| REST API (`/v1/orders`, `/v1/orderbook`, `/v1/balance`, `/health`) | Working |
+| Account read and upsert on PostgreSQL / Supabase | Working, with in-memory write-through |
+| Trade batch insert (`pgx.Batch`, idempotent on `trade_id`) | Implemented; receives no events cross-process |
+| Kafka / Redpanda transport | Not wired: each binary uses its own in-memory Go-channel bus; `KAFKA_BROKERS` is unused |
+| Redis idempotency | Not wired: client is `nil`, so deduplication is per-process memory |
+| WebSocket `/ws/market` | Accepts connections; nothing broadcasts to the hub yet |
+| Double-entry journal persistence | Journal builder exists; never called, `ledger_*` tables stay empty |
+| Order persistence and recovery | Not implemented |
+| Web terminal | Runs a client-side simulation engine; it does not call the Go gateway |
+| AuthN/Z | None (CORS `*`, client-supplied `account_id`) |
+
+Full diagrams and a gap-closing plan: `C:/Git/.notes/JOBs/fin/domain-driven-trading/architecture/architecture.md`.
