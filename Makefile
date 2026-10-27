@@ -1,4 +1,4 @@
-.PHONY: help build test test-race benchmark docker-up docker-up-services docker-down docker-down-services run-gateway run-engine run-settlement k6-load seed-db migrate-supabase
+.PHONY: help dev dev-services dev-down build test test-race benchmark docker-up docker-up-services docker-down docker-down-services run-gateway run-engine run-settlement run-web k6-load seed-db migrate-supabase
 
 # Check if Go compiler is installed on the host; if not, seamlessly fall back to containerized Go
 HAS_GO := $(shell go version 2>nul)
@@ -13,6 +13,9 @@ endif
 
 help:
 	@echo "Domain-Driven Trading Engine commands:"
+	@echo "  make dev                 - Start all backend (Docker Compose) and launch web frontend"
+	@echo "  make dev-services        - Start backend services only (external infra) and launch web frontend"
+	@echo "  make dev-down            - Stop all running Docker Compose backend containers"
 	@echo "  make build               - Build all Go binaries (gateway, engine, settlement)"
 	@echo "  make test                - Run domain & application unit tests"
 	@echo "  make test-race           - Run tests with race condition detector"
@@ -23,10 +26,27 @@ help:
 	@echo "  make docker-down         - Tear down standalone Docker containers and volumes"
 	@echo "  make docker-down-services- Tear down only Trading Services containers"
 	@echo "  make seed-db             - Seed initial accounts and positions into PostgreSQL"
+	@echo "  make migrate-supabase    - Run Supabase migration and account verification"
 	@echo "  make run-engine          - Start matching engine service locally"
 	@echo "  make run-gateway         - Start REST/WebSocket API gateway locally"
 	@echo "  make run-settlement      - Start PostgreSQL async settlement worker locally"
+	@echo "  make run-web             - Start web frontend dev server (Vite on port 5471)"
 	@echo "  make k6-load             - Run k6 high-throughput load test (>5,000 req/sec)"
+
+dev:
+	@echo "Starting backend stack with Docker Compose..."
+	docker compose -f deployments/docker-compose.yml up -d
+	@echo "Starting web trading terminal at http://localhost:5471..."
+	cd web && pnpm dev
+
+dev-services:
+	@echo "Starting backend services only..."
+	docker compose -f deployments/docker-compose.services.yml up -d
+	@echo "Starting web trading terminal at http://localhost:5471..."
+	cd web && pnpm dev
+
+dev-down:
+	docker compose -f deployments/docker-compose.yml down
 
 build:
 	@mkdir -p bin
@@ -76,6 +96,9 @@ run-gateway:
 
 run-settlement:
 	$(GO) run ./cmd/settlement/main.go
+
+run-web:
+	cd web && pnpm dev
 
 k6-load:
 	k6 run scripts/k6_benchmark.js
