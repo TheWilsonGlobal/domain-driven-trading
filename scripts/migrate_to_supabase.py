@@ -10,11 +10,20 @@ import sys
 import psycopg2
 from psycopg2.extras import execute_values
 
+def require_db_password():
+    pw = os.getenv('SUPABASE_DB_PASSWORD', '')
+    if not pw:
+        sys.exit('SUPABASE_DB_PASSWORD is not set')
+    return pw
+
+
+DB_PASSWORD = require_db_password()
+
 DB_CONFIG = {
     'host': os.getenv('SUPABASE_DB_HOST', 'db.dxbbbhwqokvfsedoiths.supabase.co'),
     'port': int(os.getenv('SUPABASE_DB_PORT', '5432')),
     'user': os.getenv('SUPABASE_DB_USER', 'postgres'),
-    'password': os.getenv('SUPABASE_DB_PASSWORD', 'P@ssw0rd123ABC#%^^$%#'),
+    'password': DB_PASSWORD,
     'dbname': os.getenv('SUPABASE_DB_NAME', 'postgres'),
     'sslmode': 'require',
 }
@@ -24,7 +33,7 @@ POOLER_CONFIG = {
     'host': 'aws-0-ap-northeast-1.pooler.supabase.com',
     'port': 5432,
     'user': 'postgres.dxbbbhwqokvfsedoiths',
-    'password': 'P@ssw0rd123ABC#%^^$%#',
+    'password': DB_PASSWORD,
     'dbname': 'postgres',
     'sslmode': 'require',
 }

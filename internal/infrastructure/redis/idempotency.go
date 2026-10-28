@@ -2,44 +2,119 @@ package redis
 
 import (
 	"context"
-	"sync"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
+	"github.com/domain-driven-trading/domain-driven-trading/internal/app/ports"
 )
 
+var errNoClient = errors.New("redis idempotency store has no client")
+
+// Connect opens a Redis client and pings it, so an unreachable or
+// misconfigured Redis stops the start instead of degrading silently. Neither
+// the password nor the server's reply is placed in the returned error.
+func Connect(ctx context.Context, addr, password string) (*redis.Client, error) {
+	c := redis.NewClient(&redis.Options{
+		Addr:         addr,
+		Password:     password,
+		DialTimeout:  3 * time.Second,
+		ReadTimeout:  2 * time.Second,
+		WriteTimeout: 2 * time.Second,
+		MaxRetries:   1,
+	})
+	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := c.Ping(pingCtx).Err(); err != nil {
+		_ = c.Close()
+		var rerr redis.Error
+		if errors.As(err, &rerr) {
+			return nil, fmt.Errorf("Redis at %s rejected the connection (check REDIS_PASSWORD)", addr)
+		}
+		return nil, fmt.Errorf("Redis at %s is unreachable", addr)
+	}
+	return c, nil
+}
+
+// RedisIdempotencyStore implements ports.IdempotencyStore on Redis. There is
+// no local fallback: a Redis error is returned to the caller, which fails the
+// request, and a key is never claimed on error.
 type RedisIdempotencyStore struct {
 	client *redis.Client
-	// In-memory fallback if Redis is unavailable
-	fallbackMu sync.Mutex
-	fallbackMap map[string]time.Time
 }
 
 func NewRedisIdempotencyStore(client *redis.Client) *RedisIdempotencyStore {
-	return &RedisIdempotencyStore{
-		client:      client,
-		fallbackMap: make(map[string]time.Time),
-	}
+	return &RedisIdempotencyStore{client: client}
 }
 
-func (s *RedisIdempotencyStore) CheckAndSet(ctx context.Context, key string, ttlSeconds int) (bool, error) {
-	if s.client != nil {
-		// SET key value NX EX ttl
-		ok, err := s.client.SetNX(ctx, key, "1", time.Duration(ttlSeconds)*time.Second).Result()
-		if err == nil {
-			return ok, nil
+type storedRecord struct {
+	Fingerprint string `json:"fp"`
+	Done        bool   `json:"done"`
+	Status      int    `json:"status,omitempty"`
+	Body        []byte `json:"body,omitempty"`
+}
+
+func encode(rec ports.IdempotencyRecord) ([]byte, error) {
+	return json.Marshal(storedRecord(rec))
+}
+
+func (s *RedisIdempotencyStore) Claim(ctx context.Context, key, fingerprint string, pendingTTL time.Duration) (bool, ports.IdempotencyRecord, error) {
+	if s.client == nil {
+		return false, ports.IdempotencyRecord{}, errNoClient
+	}
+	val, err := encode(ports.IdempotencyRecord{Fingerprint: fingerprint})
+	if err != nil {
+		return false, ports.IdempotencyRecord{}, err
+	}
+	// The key can lapse between SETNX and GET; one more round settles it.
+	for attempt := 0; attempt < 3; attempt++ {
+		ok, err := s.client.SetNX(ctx, key, val, pendingTTL).Result()
+		if err != nil {
+			return false, ports.IdempotencyRecord{}, fmt.Errorf("idempotency claim: %w", err)
 		}
+		if ok {
+			return true, ports.IdempotencyRecord{}, nil
+		}
+		raw, err := s.client.Get(ctx, key).Bytes()
+		if errors.Is(err, redis.Nil) {
+			continue
+		}
+		if err != nil {
+			return false, ports.IdempotencyRecord{}, fmt.Errorf("idempotency read: %w", err)
+		}
+		var rec storedRecord
+		if err := json.Unmarshal(raw, &rec); err != nil {
+			return false, ports.IdempotencyRecord{}, fmt.Errorf("idempotency record is corrupt: %w", err)
+		}
+		return false, ports.IdempotencyRecord(rec), nil
 	}
+	return false, ports.IdempotencyRecord{}, errors.New("idempotency key kept changing during claim")
+}
 
-	// In-memory fallback
-	s.fallbackMu.Lock()
-	defer s.fallbackMu.Unlock()
-
-	now := time.Now()
-	if exp, exists := s.fallbackMap[key]; exists && now.Before(exp) {
-		return false, nil // Duplicate found!
+func (s *RedisIdempotencyStore) Complete(ctx context.Context, key string, rec ports.IdempotencyRecord, ttl time.Duration) error {
+	if s.client == nil {
+		return errNoClient
 	}
+	rec.Done = true
+	val, err := encode(rec)
+	if err != nil {
+		return err
+	}
+	if err := s.client.Set(ctx, key, val, ttl).Err(); err != nil {
+		return fmt.Errorf("idempotency complete: %w", err)
+	}
+	return nil
+}
 
-	s.fallbackMap[key] = now.Add(time.Duration(ttlSeconds) * time.Second)
-	return true, nil
+func (s *RedisIdempotencyStore) Release(ctx context.Context, key string) error {
+	if s.client == nil {
+		return errNoClient
+	}
+	if err := s.client.Del(ctx, key).Err(); err != nil {
+		return fmt.Errorf("idempotency release: %w", err)
+	}
+	return nil
 }

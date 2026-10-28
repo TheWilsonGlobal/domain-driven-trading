@@ -11,8 +11,8 @@ services:
       - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
       - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
     ports:
-      - "19092:19092"
-      - "9644:9644"
+      - "127.0.0.1:19092:19092"
+      - "127.0.0.1:9644:9644"
     volumes:
       - redpanda-data:/var/lib/redpanda/data
     healthcheck:
@@ -26,14 +26,21 @@ services:
     build:
       context: ..
       dockerfile: deployments/Dockerfile.postgres
-    image: ddt-postgres:latest
+    image: ddt-postgres:local
     container_name: ddt-postgres
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, FOWNER, DAC_OVERRIDE]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
+      - /run/postgresql
     environment:
       POSTGRES_USER: ddt_user
-      POSTGRES_PASSWORD: ddt_secret_password
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}"
       POSTGRES_DB: domain_driven_trading
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -44,10 +51,17 @@ services:
 
   # 3. Redis 7 (Pre-Trade Idempotency deduplication & Client Order IDs)
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:6ba19c50b56777f5c11c58eff8ddb69d0d5f27ba131cffb63f180ccfd43c66af
     container_name: ddt-redis
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID]
+    security_opt: ["no-new-privileges:true"]
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD}"]
+    environment:
+      REDISCLI_AUTH: "${REDIS_PASSWORD:?set REDIS_PASSWORD}"
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -63,9 +77,15 @@ services:
       dockerfile: deployments/Dockerfile
       target: engine
     container_name: ddt-engine
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
     environment:
       KAFKA_BROKERS: "redpanda:9092"
       REDIS_ADDR: "redis:6379"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?set REDIS_PASSWORD}"
       LOG_LEVEL: "info"
     depends_on:
       redpanda:
@@ -80,9 +100,14 @@ services:
       dockerfile: deployments/Dockerfile
       target: settlement
     container_name: ddt-settlement
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
     environment:
       KAFKA_BROKERS: "redpanda:9092"
-      DATABASE_URL: "postgres://ddt_user:ddt_secret_password@postgres:5432/domain_driven_trading?sslmode=disable"
+      DATABASE_URL: "postgres://ddt_user:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/domain_driven_trading?sslmode=disable"
     depends_on:
       redpanda:
         condition: service_healthy
@@ -96,13 +121,19 @@ services:
       dockerfile: deployments/Dockerfile
       target: gateway
     container_name: ddt-gateway
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
     environment:
       PORT: "${PORT:-5470}"
       KAFKA_BROKERS: "redpanda:9092"
       REDIS_ADDR: "redis:6379"
-      DATABASE_URL: "postgres://ddt_user:ddt_secret_password@postgres:5432/domain_driven_trading?sslmode=disable"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?set REDIS_PASSWORD}"
+      DATABASE_URL: "postgres://ddt_user:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/domain_driven_trading?sslmode=disable"
     ports:
-      - "${PORT:-5470}:${PORT:-5470}"
+      - "127.0.0.1:${PORT:-5470}:${PORT:-5470}"
     depends_on:
       redpanda:
         condition: service_healthy

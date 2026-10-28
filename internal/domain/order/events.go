@@ -26,7 +26,13 @@ type OrderMatchedEvent struct {
 	Quantity       Quantity  `json:"quantity"`   // Executed lot quantity
 	MakerRemaining Quantity  `json:"maker_remaining"`
 	TakerRemaining Quantity  `json:"taker_remaining"`
-	Timestamp      time.Time `json:"timestamp"`
+	// MakerUnlock / TakerUnlock are the cash reservation shares this fill
+	// consumes from each BUY order (0 for a SELL side). The final fill of an
+	// order carries the whole remaining reservation, so rounding and price
+	// improvement are released with it.
+	MakerUnlock int64     `json:"maker_unlock"`
+	TakerUnlock int64     `json:"taker_unlock"`
+	Timestamp   time.Time `json:"timestamp"`
 }
 
 type OrderCanceledEvent struct {

@@ -49,9 +49,9 @@ func TestMatcher_PartialFillsAndSpread(t *testing.T) {
 	if takerBuy2.RemainingQuantity() != 100 {
 		t.Errorf("expected taker 2 remaining 100, got %d", takerBuy2.RemainingQuantity())
 	}
-	bestBidPrice, bidQueue, exists := ob.BestBid()
-	if !exists || bestBidPrice != 28000 || bidQueue.TotalQuantity != 100 {
-		t.Errorf("expected best bid 28000 with 100 shares, got exists=%v price=%d qty=%d", exists, bestBidPrice, bidQueue.TotalQuantity)
+	bestBidPrice, bidQty, exists := matcher.BestBid()
+	if !exists || bestBidPrice != 28000 || bidQty != 100 {
+		t.Errorf("expected best bid 28000 with 100 shares, got exists=%v price=%d qty=%d", exists, bestBidPrice, bidQty)
 	}
 }
 
@@ -91,5 +91,68 @@ func BenchmarkMatcher_LimitOrderMatching(b *testing.B) {
 			100,
 		)
 		_, _ = matcher.ProcessOrder(taker)
+	}
+}
+
+// Plan 3.1: each fill consumes a proportional share of the reservation and the
+// last fill consumes whatever is left (rounding, price improvement).
+func TestApplyFill_ProportionalReservation(t *testing.T) {
+	o, err := NewOrder("O1", "", "A", "APX", SideBuy, TypeLimit, 100, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	o.Reserve(1001)
+	if got := o.ApplyFill(3); got != 300 { // floor(1001*3/10)
+		t.Errorf("share 1 = %d, want 300", got)
+	}
+	if got := o.ApplyFill(3); got != 300 { // floor(701*3/7)
+		t.Errorf("share 2 = %d, want 300", got)
+	}
+	if got := o.ApplyFill(4); got != 401 {
+		t.Errorf("final share = %d, want the whole remainder 401", got)
+	}
+	if o.RemainingReserved != 0 || o.Status != StatusFilled {
+		t.Errorf("remaining=%d status=%s", o.RemainingReserved, o.Status)
+	}
+}
+
+// Plan 3.8: the queue total follows fills, not only removals.
+func TestOrderQueue_FillKeepsTotal(t *testing.T) {
+	q := NewOrderQueue(100)
+	a, _ := NewOrder("A", "", "X", "APX", SideBuy, TypeLimit, 100, 10)
+	b, _ := NewOrder("B", "", "Y", "APX", SideBuy, TypeLimit, 100, 5)
+	q.Enqueue(a)
+	q.Enqueue(b)
+	a.ApplyFill(4)
+	q.Fill(4)
+	if q.TotalQuantity != 11 {
+		t.Fatalf("total = %d, want 11", q.TotalQuantity)
+	}
+	q.Remove(a)
+	if q.TotalQuantity != 5 {
+		t.Fatalf("total after removing partially filled maker = %d, want 5", q.TotalQuantity)
+	}
+}
+
+// Plan 3.7: a taker never trades with its own account's resting order.
+func TestMatcher_SelfTradeCancelNewest(t *testing.T) {
+	m := NewMatcher(NewOrderBook("APX"))
+	bid, _ := NewOrder("B1", "", "A", "APX", SideBuy, TypeLimit, 100, 5)
+	if _, err := m.ProcessOrder(bid); err != nil {
+		t.Fatal(err)
+	}
+	ask, _ := NewOrder("S1", "", "A", "APX", SideSell, TypeLimit, 100, 5)
+	ev, err := m.ProcessOrder(ask)
+	if err != nil || len(ev) != 0 {
+		t.Fatalf("events=%v err=%v", ev, err)
+	}
+	if ask.Status != StatusRejected {
+		t.Errorf("status = %s", ask.Status)
+	}
+	if _, ok := m.Get("B1"); !ok {
+		t.Error("maker removed")
+	}
+	if _, ok := m.Get("S1"); ok {
+		t.Error("rejected taker rested")
 	}
 }

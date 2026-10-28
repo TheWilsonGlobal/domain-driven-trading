@@ -1,8 +1,9 @@
-﻿package query
+package query
 
 import (
 	"context"
 
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/common"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
 )
 
@@ -21,10 +22,24 @@ func NewGetOrderBookHandler(matcher *order.Matcher) *GetOrderBookHandler {
 	}
 }
 
-func (h *GetOrderBookHandler) Handle(ctx context.Context, q GetOrderBookQuery) order.MarketDepthEvent {
+const (
+	DefaultOrderBookLevels = 10
+	MaxOrderBookLevels     = 50
+)
+
+// Handle returns L2 depth. An empty symbol means the book's own symbol; any
+// other symbol than the book's is rejected with ErrSymbolMismatch. Levels
+// <= 0 mean the default and values above MaxOrderBookLevels are clamped.
+func (h *GetOrderBookHandler) Handle(ctx context.Context, q GetOrderBookQuery) (order.MarketDepthEvent, error) {
+	if q.Symbol != "" && q.Symbol != h.matcher.Symbol() {
+		return order.MarketDepthEvent{}, common.ErrSymbolMismatch
+	}
 	levels := q.MaxLevels
 	if levels <= 0 {
-		levels = 10
+		levels = DefaultOrderBookLevels
 	}
-	return h.matcher.Book().GetL2Depth(levels)
+	if levels > MaxOrderBookLevels {
+		levels = MaxOrderBookLevels
+	}
+	return h.matcher.Depth(levels), nil
 }

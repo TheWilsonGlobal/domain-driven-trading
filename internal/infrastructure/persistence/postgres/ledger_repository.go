@@ -3,8 +3,8 @@ package postgres
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/account"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type PostgresLedgerRepository struct {

@@ -1,3 +1,14 @@
+// Command engine is a single-process, in-memory matching core for local
+// experiments and smoke runs. It is NOT the production path.
+//
+// Role: it composes the same core as cmd/gateway (internal/bootstrap) but with
+// in-memory accounts, orders and event bus, and exposes no network API. Events
+// never leave the process and all state is lost on exit. The durable, served
+// system is cmd/gateway (HTTP + websocket) plus cmd/settlement.
+//
+// Deprecated: kept only so the existing compose service and Dockerfile target
+// keep building; use cmd/gateway (STORE=memory BUS=memory for a no-dependency
+// run). A follow-up may remove this command and its compose service.
 package main
 
 import (
@@ -8,75 +19,47 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/domain-driven-trading/domain-driven-trading/internal/app/command"
-	"github.com/domain-driven-trading/domain-driven-trading/internal/app/query"
-	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/app/seed"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/bootstrap"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/kafka"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/persistence/memory"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/persistence/postgres"
-	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/redis"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
+	logger.Warn("cmd/engine is deprecated: in-memory state, in-memory event bus, no API; use cmd/gateway")
 	logger.Info("starting domain-driven-trading matching core...", "version", "1.0.0-poc")
 
-	symbol := order.Symbol("APX")
-	orderBook := order.NewOrderBook(symbol)
-	matcher := order.NewMatcher(orderBook)
-
-	// In-memory repositories & event bus for resilient PoC startup
-	accountRepo := postgres.NewPostgresAccountRepository(nil)
-	idempotency := redis.NewRedisIdempotencyStore(nil)
+	ctx := context.Background()
+	accountRepo := postgres.NewPostgresAccountRepository(nil) // nil pool = in-memory
+	seedList, err := seed.FromEnv(os.Getenv)
+	if err != nil {
+		logger.Error("invalid SEED_ACCOUNTS", "error", err)
+		os.Exit(1)
+	}
+	if _, err := seed.Accounts(ctx, accountRepo, seedList, logger); err != nil {
+		logger.Error("account seeding failed", "error", err)
+		os.Exit(1)
+	}
 	eventPublisher, _ := kafka.NewInMemoryPublisher()
 
-	placeOrderHandler := command.NewPlaceOrderHandler(matcher, accountRepo, eventPublisher, idempotency)
-	_ = command.NewCancelOrderHandler(matcher, accountRepo, eventPublisher)
-	_ = query.NewGetOrderBookHandler(matcher)
-
-	// Seed some initial resting maker liquidity
-	ctx := context.Background()
-	_, _ = placeOrderHandler.Handle(ctx, command.PlaceOrderCommand{
-		ClientOrderID: "INIT_BID_1",
-		AccountID:     "ACC_INST_MM",
-		Symbol:        symbol,
-		Side:          order.SideBuy,
-		Type:          order.TypeLimit,
-		Price:         19450,
-		Quantity:      5000,
-	})
-	_, _ = placeOrderHandler.Handle(ctx, command.PlaceOrderCommand{
-		ClientOrderID: "INIT_BID_2",
-		AccountID:     "ACC_INST_MM",
-		Symbol:        symbol,
-		Side:          order.SideBuy,
-		Type:          order.TypeLimit,
-		Price:         19400,
-		Quantity:      10000,
-	})
-	_, _ = placeOrderHandler.Handle(ctx, command.PlaceOrderCommand{
-		ClientOrderID: "INIT_ASK_1",
-		AccountID:     "ACC_INST_MM",
-		Symbol:        symbol,
-		Side:          order.SideSell,
-		Type:          order.TypeLimit,
-		Price:         19500,
-		Quantity:      6000,
-	})
-	_, _ = placeOrderHandler.Handle(ctx, command.PlaceOrderCommand{
-		ClientOrderID: "INIT_ASK_2",
-		AccountID:     "ACC_INST_MM",
-		Symbol:        symbol,
-		Side:          order.SideSell,
-		Type:          order.TypeLimit,
-		Price:         19550,
-		Quantity:      12000,
+	core := bootstrap.NewCore(bootstrap.NewMatcher(), bootstrap.Ports{
+		Accounts:  accountRepo,
+		Orders:    memory.NewOrderRepository(),
+		Journal:   memory.NewTradeJournalRepository(),
+		Publisher: eventPublisher,
 	})
 
-	logger.Info("matching core initialized with continuous price-time priority", "symbol", symbol)
+	placed, err := core.SeedMakers(ctx, nil, logger)
+	if err != nil {
+		logger.Error("maker seeding failed", "error", err)
+		os.Exit(1)
+	}
+	logger.Info("matching core initialized with continuous price-time priority", "symbol", core.Symbol, "maker_orders", placed)
 
-	// Graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan

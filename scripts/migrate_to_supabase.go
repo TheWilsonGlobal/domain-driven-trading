@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -12,8 +13,20 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// requireDBPassword reads the database password from the environment.
+func requireDBPassword() (string, error) {
+	pw := os.Getenv("SUPABASE_DB_PASSWORD")
+	if pw == "" {
+		return "", errors.New("SUPABASE_DB_PASSWORD is not set")
+	}
+	return pw, nil
+}
+
 func main() {
-	dbPassword := "P@ssw0rd123ABC#%^^$%#"
+	dbPassword, err := requireDBPassword()
+	if err != nil {
+		log.Fatal(err)
+	}
 	encodedPassword := url.QueryEscape(dbPassword)
 
 	// Direct connection for migration execution (IPv6/IPv4 direct or pooler)

@@ -12,11 +12,17 @@ services:
       dockerfile: deployments/Dockerfile
       target: engine
     container_name: ddt-engine
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       KAFKA_BROKERS: "${KAFKA_BROKERS:-host.docker.internal:9100}"
       REDIS_ADDR: "${REDIS_ADDR:-host.docker.internal:6379}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?set REDIS_PASSWORD}"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
     restart: unless-stopped
 
@@ -27,11 +33,16 @@ services:
       dockerfile: deployments/Dockerfile
       target: settlement
     container_name: ddt-settlement
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       KAFKA_BROKERS: "${KAFKA_BROKERS:-host.docker.internal:9100}"
-      DATABASE_URL: "${DATABASE_URL:-postgres://postgres:password@host.docker.internal:5432/domain_driven_trading?sslmode=disable}"
+      DATABASE_URL: "${DATABASE_URL:?set DATABASE_URL}"
     restart: unless-stopped
 
   # 3. API Gateway (REST & WebSocket L2 Market Depth)
@@ -41,13 +52,19 @@ services:
       dockerfile: deployments/Dockerfile
       target: gateway
     container_name: ddt-gateway
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       PORT: "${PORT:-5470}"
       KAFKA_BROKERS: "${KAFKA_BROKERS:-host.docker.internal:9100}"
       REDIS_ADDR: "${REDIS_ADDR:-host.docker.internal:6379}"
-      DATABASE_URL: "${DATABASE_URL:-postgres://postgres:password@host.docker.internal:5432/domain_driven_trading?sslmode=disable}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?set REDIS_PASSWORD}"
+      DATABASE_URL: "${DATABASE_URL:?set DATABASE_URL}"
     ports:
-      - "${PORT:-5470}:${PORT:-5470}"
+      - "127.0.0.1:${PORT:-5470}:${PORT:-5470}"
     restart: unless-stopped

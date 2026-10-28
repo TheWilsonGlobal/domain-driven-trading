@@ -1,8 +1,35 @@
 import http from 'k6/http';
-import { check, sleep } from 'k6';
+import { check } from 'k6';
 import { Counter, Rate, Trend } from 'k6/metrics';
 
-// Custom metrics for financial throughput and latency evaluation
+// ---------------------------------------------------------------------------
+// Authentication (the gateway's /v1 is authenticated; account id comes from
+// the credential only, never from the request body):
+//
+//   K6_TOKEN=<jwt>   -> sends "Authorization: Bearer <K6_TOKEN>". A token is
+//                       bound to ONE account, so every VU trades as that
+//                       account (ACCOUNTS is ignored). For many accounts mint
+//                       one token per account outside k6 and run several
+//                       instances, or use the dev mode below.
+//   DEV_AUTH=1       -> sends "X-Dev-Account-Id: <account>" per VU. Requires the
+//                       gateway to run with AUTH_MODE=disabled-for-local-dev
+//                       AND ALLOW_INSECURE_DEV_AUTH=1, with JWKS_URL unset
+//                       (otherwise it refuses to start). In this mode the
+//                       gateway binds 127.0.0.1 only, so run k6 on the same host.
+//
+// One of the two must be set; the script refuses to run unauthenticated.
+//
+// Accounts must already exist (no auto-create). Seed them when starting the
+// gateway: SEED_ACCOUNTS=$(.\scripts\gen-seed-accounts.ps1 -Count 500) and run
+// k6 with ACCOUNTS=500 (same count) and the same ACCOUNT_PREFIX (default K6).
+//
+// Rate limits are per client IP, and k6 is one IP. Start the gateway with e.g.
+//   RATE_LIMIT_RPS=1000000 RATE_LIMIT_WRITE_RPS=1000000
+// otherwise most requests answer 429 and the success rate collapses.
+//
+// Every POST carries a unique X-Idempotency-Key (required by the gateway).
+// ---------------------------------------------------------------------------
+
 const orderPlacementSuccess = new Rate('order_placement_success');
 const matchLatencyTrend = new Trend('engine_latency_ms', true);
 const totalOrdersCounter = new Counter('orders_submitted');
@@ -29,35 +56,49 @@ export const options = {
   },
 };
 
-// The gateway runs a single APX order book; other symbols are accepted but never rest or match.
+// The gateway runs a single APX order book; other symbols are rejected.
 const SYMBOL = 'APX';
 const SIDES = ['BUY', 'SELL'];
 
-// Unknown account IDs are auto-created by the gateway with starter funds, so the load is spread
-// over many accounts (pre-created in setup()) to keep any one account from running out of cash.
-const ACCOUNT_COUNT = parseInt(__ENV.ACCOUNTS || '20000', 10);
+const TOKEN = __ENV.K6_TOKEN || '';
+const DEV_AUTH = __ENV.DEV_AUTH === '1';
+const ACCOUNT_COUNT = parseInt(__ENV.ACCOUNTS || '100', 10);
+const ACCOUNT_PREFIX = __ENV.ACCOUNT_PREFIX || 'K6';
 const gatewayPort = __ENV.PORT || '5470';
-const BASE_URL = `http://localhost:${gatewayPort}`;
+const BASE_URL = __ENV.BASE_URL || `http://localhost:${gatewayPort}`;
 
-export function setup() {
-  // Fresh prefix per run: starter shares are only granted in memory when an account is first
-  // created, so accounts left over from an earlier gateway process have no holdings to sell.
-  const prefix = __ENV.ACCOUNT_PREFIX || `K6${Date.now()}`;
-  // Create the accounts outside the measured scenario so DB inserts do not skew order latency.
-  const batchSize = 200;
-  for (let start = 0; start < ACCOUNT_COUNT; start += batchSize) {
-    const reqs = [];
-    for (let i = start; i < Math.min(start + batchSize, ACCOUNT_COUNT); i++) {
-      reqs.push(['GET', `${BASE_URL}/v1/balance/${prefix}_${i}`]);
-    }
-    http.batch(reqs);
-  }
-  return { prefix };
+// The account the calling VU trades as. Deterministic per VU, so a VU's
+// orders, cancels and balance reads all belong to the same account.
+function vuAccount() {
+  return `${ACCOUNT_PREFIX}_${(__VU - 1) % ACCOUNT_COUNT}`;
 }
 
-export default function (data) {
+function authHeaders() {
+  if (TOKEN) {
+    return { Authorization: `Bearer ${TOKEN}` };
+  }
+  return { 'X-Dev-Account-Id': vuAccount() };
+}
+
+export function setup() {
+  if (!TOKEN && !DEV_AUTH) {
+    throw new Error('set K6_TOKEN=<jwt> or DEV_AUTH=1 (gateway AUTH_MODE=disabled-for-local-dev)');
+  }
+  if (TOKEN) {
+    return {}; // the token's account id is not known to the script; nothing to probe
+  }
+  // Fail fast when the seeded accounts are missing: the first VU's account
+  // must answer 200 on its own balance (404 means SEED_ACCOUNTS was not applied).
+  const probe = `${ACCOUNT_PREFIX}_0`;
+  const res = http.get(`${BASE_URL}/v1/balance/${probe}`, { headers: { 'X-Dev-Account-Id': probe } });
+  if (res.status !== 200) {
+    throw new Error(`account ${probe} not usable (status ${res.status}); seed it with SEED_ACCOUNTS (scripts/gen-seed-accounts.ps1) and run the gateway with AUTH_MODE=disabled-for-local-dev`);
+  }
+  return {};
+}
+
+export default function () {
   const side = SIDES[Math.floor(Math.random() * SIDES.length)];
-  const accountId = `${data.prefix}_${Math.floor(Math.random() * ACCOUNT_COUNT)}`;
 
   // Price base around 19,000 - 20,500 VND in ticks of 50 VND
   const basePrice = 19500;
@@ -65,9 +106,10 @@ export default function (data) {
   const price = basePrice + tickOffset;
   const quantity = Math.floor(Math.random() * 3 + 1) * 100; // 100-300 shares (standard lots)
 
+  const key = `k6_${__VU}_${__ITER}_${Date.now()}`;
+  // No account_id in the body: the gateway ignores it and uses the credential.
   const payload = JSON.stringify({
-    client_order_id: `k6_${__VU}_${__ITER}_${Date.now()}`,
-    account_id: accountId,
+    client_order_id: key,
     symbol: SYMBOL,
     side: side,
     order_type: 'LIMIT',
@@ -76,9 +118,13 @@ export default function (data) {
   });
 
   const params = {
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: Object.assign(
+      {
+        'Content-Type': 'application/json',
+        'X-Idempotency-Key': key,
+      },
+      authHeaders(),
+    ),
   };
 
   const res = http.post(`${BASE_URL}/v1/orders`, payload, params);

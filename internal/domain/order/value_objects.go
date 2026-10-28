@@ -1,6 +1,6 @@
 package order
 
-import "fmt"
+import "github.com/domain-driven-trading/domain-driven-trading/internal/domain/common"
 
 type OrderSide string
 
@@ -30,26 +30,17 @@ const (
 	StatusRejected        OrderStatus = "REJECTED"
 )
 
-// Price represents currency ticks in VND (64-bit integer to prevent floating-point drift)
-type Price int64
+// Price, Quantity and Symbol live in the shared domain/common package so that
+// order and account do not import each other. The aliases keep this package's
+// API unchanged.
+type (
+	Price    = common.Price
+	Quantity = common.Quantity
+	Symbol   = common.Symbol
+)
 
-func (p Price) Int64() int64 {
-	return int64(p)
-}
-
-func (p Price) String() string {
-	return fmt.Sprintf("%d VND", int64(p))
-}
-
-// Quantity represents stock lot units (unsigned 32-bit integer)
-type Quantity uint32
-
-func (q Quantity) Uint32() uint32 {
-	return uint32(q)
-}
-
-type Symbol string
-
-func (s Symbol) String() string {
-	return string(s)
-}
+const (
+	TickSize = common.TickSize
+	MaxPrice = common.MaxPrice
+	MaxQty   = common.MaxQty
+)

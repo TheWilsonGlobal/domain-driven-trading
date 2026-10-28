@@ -3,9 +3,9 @@ package postgres
 import (
 	"context"
 
+	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
 )
 
 type PostgresTradeRepository struct {

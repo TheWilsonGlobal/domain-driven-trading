@@ -16,7 +16,7 @@ A production-grade, low-latency, event-driven Proof of Concept (PoC) for an inst
 - **Pre-Trade Idempotency:** Redis key deduplication (`SETNX`) on `ClientOrderID`.
 - **Interactive Web Terminal & Invariant Test Suite:** Real-time Level 2 Order Book, Execution Tape, Double-entry Ledger, Kafka Inspector, and Bilingual (English & Vietnamese) interface.
 
-> **Status:** this is a PoC. The domain, matching, risk and HTTP layers are wired; the Kafka, Redis, WebSocket and ledger-persistence adapters are not yet connected end to end. See [Implementation Status](#7-implementation-status).
+> **Status:** this is a PoC. After the phase-03 fix run the backend (matching, risk, settlement, auth, persistence, Kafka, Redis, WebSocket) is wired and tested; the web terminal is still a simulation. See [Implementation Status](#7-implementation-status).
 
 ---
 
@@ -192,17 +192,20 @@ Zero overdraft invariant is enforced prior to entering the matching queue.
 
 | Capability | State |
 |---|---|
-| FIFO price-time matching, limit and market orders | Working, unit-tested |
-| Pre-trade reservation (cash and shares) and cancel release | Working (taker side) |
-| REST API (`/v1/orders`, `/v1/orderbook`, `/v1/balance`, `/health`) | Working |
-| Account read and upsert on PostgreSQL / Supabase | Working, with in-memory write-through |
-| Trade batch insert (`pgx.Batch`, idempotent on `trade_id`) | Implemented; receives no events cross-process |
-| Kafka / Redpanda transport | Not wired: each binary uses its own in-memory Go-channel bus; `KAFKA_BROKERS` is unused |
-| Redis idempotency | Not wired: client is `nil`, so deduplication is per-process memory |
-| WebSocket `/ws/market` | Accepts connections; nothing broadcasts to the hub yet |
-| Double-entry journal persistence | Journal builder exists; never called, `ledger_*` tables stay empty |
-| Order persistence and recovery | Not implemented |
-| Web terminal | Runs a client-side simulation engine; it does not call the Go gateway |
-| AuthN/Z | None (CORS `*`, client-supplied `account_id`) |
+| FIFO price-time matching, limit and market orders | Working, thread-safe, self-trade prevention, unit-tested |
+| Pre-trade reservation (cash and shares) and cancel release | Working: per-order reservation, both sides settled, fees to `FEE_COLLECTOR`, conservation test |
+| Input validation | Working: side, type, qty/price bounds, tick, symbol whitelist, checked arithmetic |
+| REST API (`/v1/orders`, `/v1/orderbook`, `/v1/balance`, `/health`) | Working; domain errors map to 404/409/422, 413, 415, 429 |
+| AuthN/Z | JWT (JWKS) on `/v1`, account taken from the token claim; `AUTH_MODE=disabled-for-local-dev` (needs `ALLOW_INSECURE_DEV_AUTH=1`, loopback only). Unverified against a real Supabase issuer |
+| Account persistence on PostgreSQL / Supabase | Working: no create-on-read, atomic conditional reserve, holdings persisted, explicit seeding |
+| Trade and double-entry journal persistence | Working: one DB transaction per order; verified on a throwaway Postgres |
+| Order persistence and recovery | Working: book and locks rebuilt on start (restart test). Crash between the three commits can leave drift |
+| Kafka / Redpanda transport | Working: Watermill-Kafka by `KAFKA_BROKERS`; `BUS=memory` is explicit. `cmd/engine` still uses the in-memory bus (deprecated) |
+| Redis idempotency | Working: `REDIS_ADDR`, key `idem:{account}:{key}`, replay returns the stored result; `IDEMPOTENCY=memory` is explicit |
+| WebSocket `/ws/market` | Working: fed from the bus, origin allowlist, client cap, ping/pong |
+| Settlement worker | Acks only after persist, DLQ for poison, fresh-context flush; idempotent trade insert |
+| Container hardening / CI | Non-root, digest-pinned images, read-only compose services, Go 1.27.3, CI workflow (not yet run on GitHub). Images must be rebuilt to take effect |
+| Web terminal | Not done: still a client-side simulation; it does not call the gateway or send a token |
+| Not done | Proto contracts (D8), SCRAM auth for Kafka, per-account rate limits, durable outbox |
 
 Full diagrams and a gap-closing plan: `C:/Git/.notes/JOBs/fin/domain-driven-trading/architecture/architecture.md`.

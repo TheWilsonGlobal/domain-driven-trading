@@ -1,11 +1,10 @@
-﻿package account
+package account
 
 import (
 	"fmt"
 	"time"
 
 	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/common"
-	"github.com/domain-driven-trading/domain-driven-trading/internal/domain/order"
 )
 
 type EntryType string
@@ -30,7 +29,7 @@ type LedgerEntry struct {
 	Type        EntryType `json:"entry_type"` // DEBIT or CREDIT
 	AssetType   AssetType `json:"asset_type"` // CASH_VND or STOCK_SHARE
 	Symbol      string    `json:"symbol,omitempty"`
-	Amount      int64     `json:"amount"`     // Positive integer (VND amount or number of shares)
+	Amount      int64     `json:"amount"` // Positive integer (VND amount or number of shares)
 	Description string    `json:"description"`
 	Timestamp   time.Time `json:"timestamp"`
 }
@@ -49,16 +48,24 @@ func CreateTradeSettlementJournal(
 	buyerID string,
 	sellerID string,
 	feeCollectorID string,
-	symbol order.Symbol,
-	price order.Price,
-	quantity order.Quantity,
+	symbol common.Symbol,
+	price common.Price,
+	quantity common.Quantity,
 ) (*Transaction, error) {
 	now := time.Now()
 	txID := fmt.Sprintf("TX-%s", tradeID)
 
-	notionalCash := price.Int64() * int64(quantity.Uint32())
-	buyerFee := (notionalCash * DefaultFeeRateBasisPoints) / 10000
-	sellerFee := (notionalCash * DefaultFeeRateBasisPoints) / 10000
+	// Same checked arithmetic and rounding (fee rounded UP) as SettleBuyTrade /
+	// SettleSellTrade, so the journal books exactly what the accounts moved.
+	notionalCash, err := notional(price, quantity)
+	if err != nil {
+		return nil, err
+	}
+	fee, err := Fee(price, quantity)
+	if err != nil {
+		return nil, err
+	}
+	buyerFee, sellerFee := fee, fee
 	shares := int64(quantity.Uint32())
 
 	// 1. Stock asset transfer:

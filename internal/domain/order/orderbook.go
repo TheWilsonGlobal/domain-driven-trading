@@ -1,4 +1,4 @@
-﻿package order
+package order
 
 import (
 	"sort"
@@ -36,6 +36,16 @@ func (q *OrderQueue) Enqueue(o *Order) {
 
 	q.TotalQuantity += o.RemainingQuantity()
 	q.Count++
+}
+
+// Fill records that qty of a resting order was executed, keeping the level's
+// TotalQuantity equal to the sum of the remaining quantities.
+func (q *OrderQueue) Fill(qty Quantity) {
+	if q.TotalQuantity >= qty {
+		q.TotalQuantity -= qty
+	} else {
+		q.TotalQuantity = 0
+	}
 }
 
 func (q *OrderQueue) Remove(o *Order) {
@@ -99,13 +109,35 @@ func (ob *OrderBook) Symbol() Symbol {
 	return ob.symbol
 }
 
+// admit rejects an order the book can never accept, before any state changes:
+// wrong symbol or an id that is already resting. Callers must hold ob.mu.
+func (ob *OrderBook) admit(o *Order) error {
+	if o.Symbol != ob.symbol {
+		return common.ErrSymbolMismatch
+	}
+	if _, exists := ob.orders[o.ID]; exists {
+		return common.ErrOrderAlreadyExists
+	}
+	return nil
+}
+
 // AddLimitOrder adds an unmatched rest limit order to the book
 func (ob *OrderBook) AddLimitOrder(o *Order) error {
+	ob.mu.Lock()
+	defer ob.mu.Unlock()
+	return ob.addLimitOrder(o)
+}
+
+// addLimitOrder is the unlocked implementation; callers must hold ob.mu.
+func (ob *OrderBook) addLimitOrder(o *Order) error {
 	if o.Symbol != ob.symbol {
 		return common.ErrSymbolMismatch
 	}
 	if o.RemainingQuantity() == 0 {
 		return nil
+	}
+	if _, exists := ob.orders[o.ID]; exists {
+		return common.ErrOrderAlreadyExists
 	}
 
 	ob.orders[o.ID] = o
@@ -137,8 +169,31 @@ func (ob *OrderBook) AddLimitOrder(o *Order) error {
 	return nil
 }
 
-// CancelOrder removes an active order by ID in O(1)
+// CancelOrder removes an active order by ID in O(1).
+// The returned order is a snapshot, safe to read without the book lock.
 func (ob *OrderBook) CancelOrder(orderID string) (*Order, error) {
+	ob.mu.Lock()
+	defer ob.mu.Unlock()
+	o, err := ob.cancelOrder(orderID)
+	if err != nil {
+		return nil, err
+	}
+	return o.Snapshot(), nil
+}
+
+// Get returns a snapshot of a resting order, or false if it is not in the book.
+func (ob *OrderBook) Get(orderID string) (*Order, bool) {
+	ob.mu.RLock()
+	defer ob.mu.RUnlock()
+	o, ok := ob.orders[orderID]
+	if !ok {
+		return nil, false
+	}
+	return o.Snapshot(), true
+}
+
+// cancelOrder is the unlocked implementation; callers must hold ob.mu.
+func (ob *OrderBook) cancelOrder(orderID string) (*Order, error) {
 	o, exists := ob.orders[orderID]
 	if !exists {
 		return nil, common.ErrOrderNotFound
@@ -189,8 +244,30 @@ func (ob *OrderBook) removeSortedAsk(p Price) {
 	}
 }
 
-// BestBid returns highest buy price and its queue
-func (ob *OrderBook) BestBid() (Price, *OrderQueue, bool) {
+// BestBid returns the highest buy price and the total resting quantity at it.
+func (ob *OrderBook) BestBid() (Price, Quantity, bool) {
+	ob.mu.RLock()
+	defer ob.mu.RUnlock()
+	p, q, ok := ob.bestBid()
+	if !ok {
+		return 0, 0, false
+	}
+	return p, q.TotalQuantity, true
+}
+
+// BestAsk returns the lowest sell price and the total resting quantity at it.
+func (ob *OrderBook) BestAsk() (Price, Quantity, bool) {
+	ob.mu.RLock()
+	defer ob.mu.RUnlock()
+	p, q, ok := ob.bestAsk()
+	if !ok {
+		return 0, 0, false
+	}
+	return p, q.TotalQuantity, true
+}
+
+// bestBid returns highest buy price and its queue; callers must hold ob.mu.
+func (ob *OrderBook) bestBid() (Price, *OrderQueue, bool) {
 	if len(ob.sortedBids) == 0 {
 		return 0, nil, false
 	}
@@ -198,8 +275,8 @@ func (ob *OrderBook) BestBid() (Price, *OrderQueue, bool) {
 	return p, ob.bidsMap[p], true
 }
 
-// BestAsk returns lowest sell price and its queue
-func (ob *OrderBook) BestAsk() (Price, *OrderQueue, bool) {
+// bestAsk returns lowest sell price and its queue; callers must hold ob.mu.
+func (ob *OrderBook) bestAsk() (Price, *OrderQueue, bool) {
 	if len(ob.sortedAsks) == 0 {
 		return 0, nil, false
 	}
@@ -207,8 +284,14 @@ func (ob *OrderBook) BestAsk() (Price, *OrderQueue, bool) {
 	return p, ob.asksMap[p], true
 }
 
-// GetL2Depth returns Level 2 aggregated market depth up to maxLevels
+// GetL2Depth returns Level 2 aggregated market depth up to maxLevels.
+// It takes the write lock because it increments depthSeq.
 func (ob *OrderBook) GetL2Depth(maxLevels int) MarketDepthEvent {
+	ob.mu.Lock()
+	defer ob.mu.Unlock()
+	if maxLevels < 0 {
+		maxLevels = 0
+	}
 	ob.depthSeq++
 
 	bids := make([]PriceLevelDepth, 0, maxLevels)

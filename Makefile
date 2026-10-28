@@ -1,15 +1,12 @@
-.PHONY: help dev dev-services dev-down build test test-race benchmark docker-up docker-up-services docker-down docker-down-services run-gateway run-engine run-settlement run-web k6-load seed-db migrate-supabase
+.PHONY: help vet test-race-docker govulncheck dev dev-services dev-down build test test-race benchmark docker-up docker-up-services docker-down docker-down-services run-gateway run-engine run-settlement run-web k6-load seed-db migrate-supabase
 
-# Check if Go compiler is installed on the host; if not, seamlessly fall back to containerized Go
-HAS_GO := $(shell go version 2>nul)
-
-ifeq ($(HAS_GO),)
-GO = docker run --rm -v "$(CURDIR):/app" -w /app golang:1.22-alpine go
-GO_RACE = docker run --rm -v "$(CURDIR):/app" -w /app golang:1.22 go
-else
+# Go is required on the host (version pinned by the go directive in go.mod).
+# The old bind-mount docker fallback was dropped: bind mounts do not work on
+# this Docker daemon. Race tests need a C compiler; without one use
+# `make test-race-docker` (docker create/cp/start/logs, no bind mount).
 GO = go
-GO_RACE = go
-endif
+# Keep in step with deployments/Dockerfile and go.mod.
+GO_IMAGE = golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb
 
 help:
 	@echo "Domain-Driven Trading Engine commands:"
@@ -18,7 +15,8 @@ help:
 	@echo "  make dev-down            - Stop all running Docker Compose backend containers"
 	@echo "  make build               - Build all Go binaries (gateway, engine, settlement)"
 	@echo "  make test                - Run domain & application unit tests"
-	@echo "  make test-race           - Run tests with race condition detector"
+	@echo "  make test-race           - Run all tests with the race detector (needs gcc)"
+	@echo "  make test-race-docker    - Same, inside a golang container (docker cp, no bind mount)"
 	@echo "  make benchmark           - Run matching engine throughput benchmarks"
 	@echo "  make docker-up           - Launch standalone stack (Redpanda, PostgreSQL 16, Redis, Services)"
 	@echo "                             Use 'make docker-up SERVICES_ONLY=true' to start Services only (using external infra)"
@@ -54,11 +52,28 @@ build:
 	$(GO) build -o bin/engine ./cmd/engine
 	$(GO) build -o bin/settlement ./cmd/settlement
 
-test:
-	$(GO) test -v ./internal/domain/... ./internal/app/...
+vet:
+	$(GO) vet ./...
 
+test:
+	$(GO) test -count=1 ./...
+
+# Needs gcc on the host (CGO). Without gcc use test-race-docker.
 test-race:
-	$(GO_RACE) test -race -v ./internal/domain/... ./internal/app/...
+	CGO_ENABLED=1 $(GO) test -race -count=1 ./...
+
+# Race tests inside a container: copy the tree in with docker cp (no bind mount).
+test-race-docker:
+	@cid=$$(docker create -w /w $(GO_IMAGE) sh -c "apk add --no-cache gcc musl-dev >/dev/null && CGO_ENABLED=1 go test -race -count=1 ./...") ; \
+	for f in go.mod go.sum cmd internal scripts; do docker cp $$f $$cid:/w/$$f || exit 1; done ; \
+	docker start $$cid >/dev/null ; \
+	rc=$$(docker wait $$cid) ; \
+	docker logs $$cid 2>&1 | tail -60 ; \
+	docker rm $$cid >/dev/null ; \
+	exit $$rc
+
+govulncheck:
+	$(GO) run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
 benchmark:
 	$(GO) test -bench=. -benchmem -benchtime=5s ./internal/domain/order/...

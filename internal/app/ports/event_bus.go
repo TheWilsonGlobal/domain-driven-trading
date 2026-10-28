@@ -1,4 +1,4 @@
-﻿package ports
+package ports
 
 import (
 	"context"
@@ -10,6 +10,9 @@ const (
 	TopicOrderPlacement = "orders.placement"
 	TopicOrderEvents    = "orders.events"
 	TopicMarketDepth    = "market.depth"
+	// TopicOrderEventsDLQ receives events a consumer cannot parse or that fail
+	// validation; they are acknowledged on the source topic.
+	TopicOrderEventsDLQ = "orders.events.dlq"
 )
 
 type EventPublisher interface {
