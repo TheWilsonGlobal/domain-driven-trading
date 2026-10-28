@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Go checks run inside the golang container by scripts/ci-go.ps1.
+set -euo pipefail
+cd /src
+out="$(gofmt -l cmd internal scripts)"
+if [ -n "$out" ]; then echo "gofmt needed:"; echo "$out"; exit 1; fi
+go vet ./...
+CGO_ENABLED=1 go test -race -count=1 ./...
+go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...

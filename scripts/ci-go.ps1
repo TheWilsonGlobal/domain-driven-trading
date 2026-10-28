@@ -1,22 +1,20 @@
 # Runs the Go checks inside a golang container. The Docker daemon on the
 # self-hosted runner rejects Windows bind mounts, so the source is copied in.
-$ErrorActionPreference = 'Stop'
+# The checks live in ci-go.sh: Windows PowerShell 5.1 strips double quotes from
+# inline arguments passed to native commands, which breaks an inline script.
+$ErrorActionPreference = 'Continue'
 $image = 'golang:1.27.3'
 $name = "ddt-ci-go-$($env:GITHUB_RUN_ID)-$PID"
-$script = @'
-set -e
-cd /src
-out="$(gofmt -l cmd internal scripts)"
-if [ -n "$out" ]; then echo "gofmt needed:"; echo "$out"; exit 1; fi
-go vet ./...
-CGO_ENABLED=1 go test -race -count=1 ./...
-go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
-'@
-docker create --name $name $image bash -c $script | Out-Null
+$rc = 1
 try {
+  docker create --name $name $image bash /src/scripts/ci-go.sh | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw 'docker create failed' }
   docker cp "$PWD/." "${name}:/src"
-  docker start -a $name
-  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  if ($LASTEXITCODE -ne 0) { throw 'docker cp failed' }
+  docker start $name | Out-Null
+  $rc = [int](docker wait $name)
+  docker logs $name 2>&1 | ForEach-Object { "$_" }
 } finally {
   docker rm -f $name | Out-Null
 }
+exit $rc
