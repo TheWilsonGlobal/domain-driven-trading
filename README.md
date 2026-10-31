@@ -1,4 +1,4 @@
-# Domain-Driven Trading Engine (`domain-driven-trading`)
+# Domain-Driven Trading Engine (`ddd-trading`)
 
 A production-grade, low-latency, event-driven Proof of Concept (PoC) for an institutional securities trading core and risk engine in **Go (Golang)** with an interactive **React & TypeScript** web terminal. Built with Domain-Driven Design (DDD), Hexagonal Architecture, In-Memory FIFO Price-Time Priority order matching, Double-Entry ledger bookkeeping, pre-trade purchasing power ("sức mua") validation, and Kafka/Redpanda Event-Driven Architecture via Watermill.
 
