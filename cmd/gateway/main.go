@@ -15,6 +15,7 @@ import (
 	"github.com/domain-driven-trading/domain-driven-trading/internal/app/ports"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/app/seed"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/bootstrap"
+	"github.com/domain-driven-trading/domain-driven-trading/internal/config"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/auth"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/kafka"
 	"github.com/domain-driven-trading/domain-driven-trading/internal/infrastructure/persistence/memory"
@@ -63,7 +64,7 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "5470"
+		port = config.DefaultPort
 	}
 
 	// Fail fast on a bad auth configuration (unknown mode, jwt without
@@ -171,7 +172,7 @@ func main() {
 		logger.Error("invalid HTTP configuration", "error", err)
 		os.Exit(1)
 	}
-	wsMax, err := envPositiveInt(os.Getenv, "WS_MAX_CLIENTS", 1000)
+	wsMax, err := envPositiveInt(os.Getenv, "WS_MAX_CLIENTS", config.DefaultWSMaxClients)
 	if err != nil {
 		logger.Error("invalid WS_MAX_CLIENTS", "error", err)
 		os.Exit(1)

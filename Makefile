@@ -7,6 +7,8 @@
 GO = go
 # Keep in step with deployments/Dockerfile and go.mod.
 GO_IMAGE = golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb
+# Compose reads only the root .env (deployments/.env is not used).
+COMPOSE = docker compose --env-file .env
 
 help:
 	@echo "Domain-Driven Trading Engine commands:"
@@ -33,18 +35,18 @@ help:
 
 dev:
 	@echo "Starting backend stack with Docker Compose..."
-	docker compose -f deployments/docker-compose.yml up -d
+	$(COMPOSE) -f deployments/docker-compose.yml up -d
 	@echo "Starting web trading terminal at http://localhost:5471..."
 	cd web && pnpm dev
 
 dev-services:
 	@echo "Starting backend services only..."
-	docker compose -f deployments/docker-compose.services.yml up -d
+	$(COMPOSE) -f deployments/docker-compose.services.yml up -d
 	@echo "Starting web trading terminal at http://localhost:5471..."
 	cd web && pnpm dev
 
 dev-down:
-	docker compose -f deployments/docker-compose.yml down
+	$(COMPOSE) -f deployments/docker-compose.yml down
 
 build:
 	@mkdir -p bin
@@ -80,19 +82,19 @@ benchmark:
 
 docker-up:
 ifeq ($(SERVICES_ONLY),true)
-	docker compose -f deployments/docker-compose.services.yml up -d
+	$(COMPOSE) -f deployments/docker-compose.services.yml up -d
 else
-	docker compose -f deployments/docker-compose.yml up -d
+	$(COMPOSE) -f deployments/docker-compose.yml up -d
 endif
 
 docker-up-services:
-	docker compose -f deployments/docker-compose.services.yml up -d
+	$(COMPOSE) -f deployments/docker-compose.services.yml up -d
 
 docker-down:
-	docker compose -f deployments/docker-compose.yml down -v
+	$(COMPOSE) -f deployments/docker-compose.yml down -v
 
 docker-down-services:
-	docker compose -f deployments/docker-compose.services.yml down
+	$(COMPOSE) -f deployments/docker-compose.services.yml down
 
 seed-db:
 	@echo "Seeding accounts and positions into PostgreSQL..."

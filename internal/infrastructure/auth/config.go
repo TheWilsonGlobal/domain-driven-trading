@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/domain-driven-trading/domain-driven-trading/internal/config"
 )
 
 type Mode string
@@ -14,12 +16,6 @@ const (
 	ModeJWT      Mode = "jwt"
 	ModeDisabled Mode = "disabled-for-local-dev"
 )
-
-// DefaultAccountClaim is the token claim holding the trading account id.
-// There is deliberately no fallback to "sub": a Supabase "sub" is a user UUID,
-// not a trading account, so silently using it would mask a misconfiguration.
-// A dotted path (for example app_metadata.account_id) selects a nested claim.
-const DefaultAccountClaim = "account_id"
 
 // Config is the authentication configuration read from the environment.
 type Config struct {
@@ -45,7 +41,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		cfg.Mode = ModeJWT
 	}
 	if cfg.AccountClaim == "" {
-		cfg.AccountClaim = DefaultAccountClaim
+		cfg.AccountClaim = config.DefaultAccountClaim
 	}
 	switch cfg.Mode {
 	case ModeDisabled:

@@ -23,10 +23,11 @@ services:
 
   # 2. PostgreSQL 16 (Relational Double-Entry Ledger and Trade Audit Store)
   postgres:
-    build:
-      context: ..
-      dockerfile: deployments/Dockerfile.postgres
-    image: ddt-postgres:local
+    # Stock image. The migrations are mounted into initdb, so there is no build.
+    # 002_supabase_init.sql is intentionally NOT mounted: it targets Supabase
+    # (service_role policies) and fails on a plain local postgres.
+    # Files run in lexical order on first init of an empty data directory.
+    image: postgres:16-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
     container_name: ddt-postgres
     read_only: true
     cap_drop: [ALL]
@@ -43,6 +44,8 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ../internal/infrastructure/persistence/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+      - ../internal/infrastructure/persistence/migrations/003_persistence_recovery.sql:/docker-entrypoint-initdb.d/003_persistence_recovery.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ddt_user -d domain_driven_trading"]
       interval: 5s

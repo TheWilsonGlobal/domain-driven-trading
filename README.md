@@ -102,7 +102,7 @@ A production-grade, low-latency, event-driven Proof of Concept (PoC) for an inst
 - (Optional) k6 for load testing
 
 ### Configuration
-Copy `.env.example` to `.env`. Key variables: `PORT` (5470), `WEB_PORT` (5471), `DATABASE_URL`, `DIRECT_URL`, `KAFKA_BROKERS`, `REDIS_ADDR`, and the `SUPABASE_*` keys. Never commit real credentials. Without `DATABASE_URL` the gateway falls back to in-memory accounts.
+Copy `.env.example` to `.env`. Set `DATABASE_URL`, `KAFKA_BROKERS`, `REDIS_ADDR`, and the auth values (`JWKS_URL`, `JWT_ISSUER`, `JWT_AUDIENCE`). Shared defaults such as ports, rate limits and `AUTH_ACCOUNT_CLAIM` live in `internal/config` and are overridden only when set. Never commit real credentials. Without `DATABASE_URL` the gateway refuses to start unless `STORE=memory` is set.
 
 ### Run Backend with Docker Compose
 

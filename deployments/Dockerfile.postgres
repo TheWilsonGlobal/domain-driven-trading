@@ -1,6 +1,0 @@
-FROM postgres:16-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
-# 002_supabase_init.sql is intentionally NOT copied: it targets Supabase
-# (service_role policies) and fails on a plain local postgres.
-# Files run in lexical order on first init of an empty data directory.
-COPY internal/infrastructure/persistence/migrations/001_init.sql /docker-entrypoint-initdb.d/001_init.sql
-COPY internal/infrastructure/persistence/migrations/003_persistence_recovery.sql /docker-entrypoint-initdb.d/003_persistence_recovery.sql

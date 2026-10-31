@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/domain-driven-trading/domain-driven-trading/internal/config"
 )
 
 // Config is the HTTP hardening configuration (plan phase 7).
@@ -21,19 +23,13 @@ type Config struct {
 	AllowedOrigins []string
 }
 
-const (
-	defaultRateReadPerSec  = 100
-	defaultRateWritePerSec = 50
-	defaultWebPort         = "5471"
-)
-
 // DefaultConfig is the safe local default: localhost origins only, no proxy
 // trust.
 func DefaultConfig() Config {
 	return Config{
-		RateReadPerSec:  defaultRateReadPerSec,
-		RateWritePerSec: defaultRateWritePerSec,
-		AllowedOrigins:  defaultOrigins(defaultWebPort),
+		RateReadPerSec:  config.DefaultRateReadPerSec,
+		RateWritePerSec: config.DefaultRateWritePerSec,
+		AllowedOrigins:  defaultOrigins(config.DefaultWebPort),
 	}
 }
 
