@@ -28,7 +28,7 @@ const (
 type BusConfig struct {
 	Mode    BusMode
 	Brokers []string
-	// SASL/PLAIN credentials and TLS, all off by default (local compose).
+	// SASL/SCRAM-SHA-256 credentials and TLS, all off by default (local compose).
 	SASLUser     string
 	SASLPassword string
 	TLS          bool
@@ -40,7 +40,7 @@ type BusConfig struct {
 //	BUS=kafka | unset         -> Kafka/Redpanda; KAFKA_BROKERS (comma list) required
 //	neither configured        -> error: there is no silent in-memory fallback
 //
-// KAFKA_SASL_USER + KAFKA_SASL_PASSWORD enable SASL/PLAIN, KAFKA_TLS=true
+// KAFKA_SASL_USER + KAFKA_SASL_PASSWORD enable SASL/SCRAM-SHA-256, KAFKA_TLS=true
 // enables TLS. Secrets are never put in an error message.
 func ResolveBus(getenv func(string) string) (BusConfig, error) {
 	brokersRaw := strings.TrimSpace(getenv("KAFKA_BROKERS"))
@@ -108,7 +108,8 @@ func applyNet(sc *sarama.Config, cfg BusConfig) {
 	}
 	if cfg.SASLUser != "" {
 		sc.Net.SASL.Enable = true
-		sc.Net.SASL.Mechanism = sarama.SASLTypePlaintext
+		sc.Net.SASL.Mechanism = sarama.SASLTypeSCRAMSHA256
+		sc.Net.SASL.SCRAMClientGeneratorFunc = newSCRAMClient
 		sc.Net.SASL.Handshake = true
 		sc.Net.SASL.User = cfg.SASLUser
 		sc.Net.SASL.Password = cfg.SASLPassword
