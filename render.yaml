@@ -91,7 +91,7 @@ services:
   - type: web
     name: ddt-web
     runtime: static
-    buildCommand: cd web && npm install -g pnpm@10 && pnpm install --frozen-lockfile && pnpm build
+    buildCommand: cd web && npx -y pnpm@10 install --frozen-lockfile && npx -y pnpm@10 build
     staticPublishPath: ./web/dist
     envVars:
       - key: NODE_VERSION
