@@ -1,5 +1,6 @@
 .git
 .env
+.env.cloud
 web/node_modules
 web/dist
 bin
