@@ -26,5 +26,9 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    // `vite preview` runs on Render (ddd-web). Vite 5.4 rejects any Host it does not list.
+    preview: {
+      allowedHosts: ['.onrender.com'],
+    },
   };
 });
