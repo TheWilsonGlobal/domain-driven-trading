@@ -27,3 +27,10 @@ ENTRYPOINT ["/usr/local/bin/engine"]
 FROM base AS settlement
 COPY --from=builder /app/bin/settlement /usr/local/bin/settlement
 ENTRYPOINT ["/usr/local/bin/settlement"]
+
+# Render builds the LAST stage and has no per-stage target, so this stage holds
+# the two binaries Render runs. render.yaml picks one per service via
+# dockerCommand. Keep it last. Compose keeps using the named targets above.
+FROM base AS render
+COPY --from=builder /app/bin/gateway /usr/local/bin/gateway
+COPY --from=builder /app/bin/settlement /usr/local/bin/settlement

@@ -86,6 +86,7 @@ A production-grade, low-latency, event-driven Proof of Concept (PoC) for an inst
 │   ├── migrate_to_supabase.go/.py # Schema migration + account verification
 │   └── dev.ps1                   # Windows dev launcher
 ├── Makefile
+├── render.yaml                   # Render Blueprint (see "Deploy on Render")
 ├── go.mod
 └── README.md
 ```
@@ -149,6 +150,27 @@ pnpm install
 pnpm dev
 ```
 Navigate to `http://localhost:5471` to access the interactive bilingual trading terminal (API Gateway runs on `http://localhost:5470`).
+
+### Deploy on Render
+
+`render.yaml` is a Blueprint for the gateway (web), the settlement worker, the static web app, Postgres 16 and Key Value (Redis). The engine is not deployed (deprecated). Render has no managed Kafka, so bring a broker (Redpanda Cloud, Confluent, Upstash, ...).
+
+1. **Broker.** Create a Kafka/Redpanda cluster. Note the bootstrap address (`KAFKA_BROKERS`) and any SASL user/password. The Blueprint sets `KAFKA_TLS=true`; change it to `false` only for a plain broker.
+2. **Blueprint.** In Render: New → Blueprint, pick this repo. Fill the `sync: false` values: `KAFKA_BROKERS`, `KAFKA_SASL_*`, `JWKS_URL`, `JWT_ISSUER`, `JWT_AUDIENCE`, and `CORS_ALLOWED_ORIGINS` (the exact `ddt-web` origin, `https://…onrender.com`, which you can set after the static site is created).
+3. **Migrations.** Postgres does not run the init scripts on Render. Once `ddt-postgres` is up, apply the schema with its external URL (append `?sslmode=require`):
+   ```bash
+   psql "<External Database URL from ddt-postgres>?sslmode=require" \
+     -f internal/infrastructure/persistence/migrations/001_init.sql \
+     -f internal/infrastructure/persistence/migrations/003_persistence_recovery.sql
+   ```
+   Skip `002_supabase_init.sql`: it targets Supabase's `service_role` policies. Until the tables exist, the gateway exits at account seeding and Render restarts it.
+4. **Check.** `curl https://<ddt-gateway>.onrender.com/health` should return 200.
+
+Notes:
+- Keep the gateway at **one instance**. The order book lives in the process and is rebuilt from Postgres on start. A second instance would match against its own copy.
+- `REDIS_ADDR` takes the Key Value `connectionString` (`redis://…`), so the internal URL works as-is. `maxmemoryPolicy: noeviction` keeps idempotency keys from being evicted.
+- `TRUSTED_PROXY` stays `false`. Behind Render's proxy every client shares one rate-limit bucket. Raise `RATE_LIMIT_RPS` / `RATE_LIMIT_WRITE_RPS` or fix proxy handling before real multi-user traffic.
+- The Docker image is the `render` stage of `deployments/Dockerfile`. Render builds the last stage and has no per-stage target, so each service picks its binary with `dockerCommand`.
 
 ### High-Throughput Load Testing (k6)
 ```bash

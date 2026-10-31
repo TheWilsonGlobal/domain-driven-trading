@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -17,26 +18,46 @@ var errNoClient = errors.New("redis idempotency store has no client")
 // Connect opens a Redis client and pings it, so an unreachable or
 // misconfigured Redis stops the start instead of degrading silently. Neither
 // the password nor the server's reply is placed in the returned error.
+//
+// addr is host:port, or a redis:// / rediss:// URL (the form Render Key Value
+// hands out). A password in the URL wins; otherwise password is used.
 func Connect(ctx context.Context, addr, password string) (*redis.Client, error) {
-	c := redis.NewClient(&redis.Options{
-		Addr:         addr,
-		Password:     password,
-		DialTimeout:  3 * time.Second,
-		ReadTimeout:  2 * time.Second,
-		WriteTimeout: 2 * time.Second,
-		MaxRetries:   1,
-	})
+	opts, err := options(addr, password)
+	if err != nil {
+		return nil, err
+	}
+	opts.DialTimeout = 3 * time.Second
+	opts.ReadTimeout = 2 * time.Second
+	opts.WriteTimeout = 2 * time.Second
+	opts.MaxRetries = 1
+	c := redis.NewClient(opts)
 	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := c.Ping(pingCtx).Err(); err != nil {
 		_ = c.Close()
 		var rerr redis.Error
 		if errors.As(err, &rerr) {
-			return nil, fmt.Errorf("Redis at %s rejected the connection (check REDIS_PASSWORD)", addr)
+			return nil, fmt.Errorf("Redis at %s rejected the connection (check REDIS_PASSWORD)", opts.Addr)
 		}
-		return nil, fmt.Errorf("Redis at %s is unreachable", addr)
+		return nil, fmt.Errorf("Redis at %s is unreachable", opts.Addr)
 	}
 	return c, nil
+}
+
+// options turns REDIS_ADDR into client options. The URL form carries the
+// password, so the error for a bad URL never repeats it.
+func options(addr, password string) (*redis.Options, error) {
+	if !strings.Contains(addr, "://") {
+		return &redis.Options{Addr: addr, Password: password}, nil
+	}
+	opts, err := redis.ParseURL(addr)
+	if err != nil {
+		return nil, errors.New("REDIS_ADDR is not a valid redis:// or rediss:// URL")
+	}
+	if opts.Password == "" {
+		opts.Password = password
+	}
+	return opts, nil
 }
 
 // RedisIdempotencyStore implements ports.IdempotencyStore on Redis. There is

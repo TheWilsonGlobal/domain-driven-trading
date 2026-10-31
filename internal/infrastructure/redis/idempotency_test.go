@@ -107,3 +107,31 @@ func TestConnect_WithPasswordAndUnreachable(t *testing.T) {
 		t.Fatalf("err = %v, want an 'unreachable' error", err)
 	}
 }
+
+func TestConnect_AcceptsURLForm(t *testing.T) {
+	mr := miniredis.RunT(t)
+	mr.RequireAuth("s3cret-redis-pw")
+
+	// Password carried by the URL (what Render Key Value hands out).
+	c, err := redis.Connect(context.Background(), "redis://:s3cret-redis-pw@"+mr.Addr(), "")
+	if err != nil {
+		t.Fatalf("URL with password: %v", err)
+	}
+	c.Close()
+
+	// No password in the URL: REDIS_PASSWORD fills it in.
+	c, err = redis.Connect(context.Background(), "redis://"+mr.Addr(), "s3cret-redis-pw")
+	if err != nil {
+		t.Fatalf("URL without password + REDIS_PASSWORD: %v", err)
+	}
+	c.Close()
+
+	// A malformed URL is refused and the password it carries never appears.
+	_, err = redis.Connect(context.Background(), "redis://:s3cret-redis-pw@[bad", "")
+	if err == nil {
+		t.Fatal("malformed URL must fail the start")
+	}
+	if strings.Contains(err.Error(), "s3cret") {
+		t.Fatalf("password leaked: %v", err)
+	}
+}

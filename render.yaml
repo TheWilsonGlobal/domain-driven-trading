@@ -1,0 +1,114 @@
+# Render Blueprint for domain-driven-trading.
+#
+#   ddt-gateway     web (Docker)     REST + /ws/market, reads/writes Postgres, Redis, Kafka
+#   ddt-settlement  worker (Docker)  consumes orders.events, persists trades to Postgres
+#   ddt-web         static (Vite)    trading terminal (client-side simulation today)
+#   ddt-postgres    Postgres 16
+#   ddt-redis       Key Value        idempotency keys
+#
+# Not deployed: cmd/engine (deprecated, in-memory only, no API).
+# Not on Render: Kafka/Redpanda. Use a managed broker (Redpanda Cloud, Confluent,
+# Upstash, ...) and fill in KAFKA_BROKERS, plus KAFKA_SASL_* if it needs SASL.
+#
+# Keep ddt-gateway at ONE instance. The order book lives in the process and is
+# rebuilt from Postgres at start. A second instance would match against its own copy.
+#
+# Before the first gateway start, apply the migrations to ddt-postgres
+# (001_init.sql, then 003_persistence_recovery.sql; NOT 002, which is Supabase-only).
+# See README "Deploy on Render".
+
+services:
+  - type: web
+    name: ddt-gateway
+    runtime: docker
+    dockerfilePath: ./deployments/Dockerfile
+    dockerContext: .
+    dockerCommand: /usr/local/bin/gateway
+    plan: 1c-2g
+    region: singapore
+    healthCheckPath: /health
+    envVars:
+      # Render injects PORT; the gateway listens on it.
+      - key: STORE
+        value: postgres
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ddt-postgres
+          property: connectionString
+      - key: IDEMPOTENCY
+        value: redis
+      - key: REDIS_ADDR
+        fromService:
+          type: keyvalue
+          name: ddt-redis
+          property: connectionString
+      - key: KAFKA_BROKERS
+        sync: false
+      - key: KAFKA_TLS
+        value: "true"
+      - key: KAFKA_SASL_USER
+        sync: false
+      - key: KAFKA_SASL_PASSWORD
+        sync: false
+      - key: AUTH_MODE
+        value: jwt
+      - key: JWKS_URL
+        sync: false
+      - key: JWT_ISSUER
+        sync: false
+      - key: JWT_AUDIENCE
+        sync: false
+      # Exact origin of ddt-web, e.g. https://ddt-web.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      # Keep false: Render's proxy would otherwise let any client pick its IP
+      # for the rate limiter. With it false, all clients share one limiter bucket.
+      - key: TRUSTED_PROXY
+        value: "false"
+
+  - type: worker
+    name: ddt-settlement
+    runtime: docker
+    dockerfilePath: ./deployments/Dockerfile
+    dockerContext: .
+    dockerCommand: /usr/local/bin/settlement
+    plan: 0.5c-512mb
+    region: singapore
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ddt-postgres
+          property: connectionString
+      - key: KAFKA_BROKERS
+        sync: false
+      - key: KAFKA_TLS
+        value: "true"
+      - key: KAFKA_SASL_USER
+        sync: false
+      - key: KAFKA_SASL_PASSWORD
+        sync: false
+
+  - type: web
+    name: ddt-web
+    runtime: static
+    buildCommand: cd web && npm install -g pnpm@10 && pnpm install --frozen-lockfile && pnpm build
+    staticPublishPath: ./web/dist
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+
+  - type: keyvalue
+    name: ddt-redis
+    plan: 256mb
+    # Internal-only: reachable from the other services, not from the internet.
+    ipAllowList: []
+    # Eviction would silently drop idempotency keys and let a retried order
+    # place twice. Refuse writes at the limit instead.
+    maxmemoryPolicy: noeviction
+
+databases:
+  - name: ddt-postgres
+    plan: 1c-2g
+    region: singapore
+    databaseName: domain_driven_trading
+    postgresMajorVersion: "16"
